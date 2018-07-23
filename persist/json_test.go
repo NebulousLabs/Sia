@@ -2,6 +2,7 @@ package persist
 
 import (
 	"bytes"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sync"
@@ -160,7 +161,7 @@ func TestLoadJSONCorruptedFiles(t *testing.T) {
 	// Try loading a file with a manual checksum.
 	err = LoadJSON(testMeta, &obj2, filepath.Join("testdata", "manual.json"))
 	if err != nil {
-		t.Error("bad checksum should have failed")
+		t.Error("loading file with a manual checksum should have succeeded")
 	}
 	// Verify equivalence.
 	if obj2.One != obj1.One {
@@ -180,6 +181,23 @@ func TestLoadJSONCorruptedFiles(t *testing.T) {
 	}
 	if !bytes.Equal(obj2.Three, []byte("more dog")) {
 		t.Error("persist mismatch")
+	}
+
+	// Try loading a file with a bad manual checksum.
+	err = LoadJSON(testMeta, &obj2, filepath.Join("testdata", "manual_bad.json"))
+	if err == nil {
+		t.Error("bad manual checksum should not have resulted in loading correctly")
+	}
+	err = LoadJSON(testMeta, &obj2, filepath.Join("testdata", "manual_bad2.json"))
+	if err == nil {
+		t.Error("bad manual checksum should not have resulted in loading correctly")
+	}
+
+	// Try loading a file where the main has been corrupted in a way that makes
+	// the file too short.
+	err = LoadJSON(testMeta, &obj2, filepath.Join("testdata", "corruptmainshort.json"))
+	if err != nil {
+		t.Error("short mainfile seems to be causing problems")
 	}
 
 	// Try loading a corrupted main file.
@@ -255,5 +273,93 @@ func TestLoadJSONCorruptedFiles(t *testing.T) {
 	}
 	if !bytes.Equal(obj2.Three, []byte("more dog")) {
 		t.Error("persist mismatch")
+	}
+}
+
+// TestSaveCorruptedMainFile checks that SaveJSON refuses to overwrite the temp
+// file if the main file is corrupted.
+func TestSaveJSONCorruptedMainFile(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
+	// Create the directory used for testing.
+	dir := filepath.Join(build.TempDir(persistDir), t.Name())
+	err := os.MkdirAll(dir, 0700)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Define the test object that will be getting saved.
+	testMeta := Metadata{"Test Struct", "v1.2.1"}
+	type testStruct struct {
+		One   string
+		Two   uint64
+		Three []byte
+	}
+	// 'newObj' is different from the object that has already been saved to
+	// 'corruptmain.json' and 'corruptmain.json_temp'.
+	newObj := testStruct{"cat", 716, []byte("cat attack")}
+
+	// Copy the corruptmain files to the testing dir.
+	corruptMainFileSource := filepath.Join("testdata", "corruptmain.json")
+	corruptMainTempFileSource := filepath.Join("testdata", "corruptmain.json_temp")
+	corruptMainFileDest := filepath.Join(dir, "corruptmain.json")
+	corruptMainTempFileDest := filepath.Join(dir, "corruptmain.json_temp")
+	build.CopyFile(corruptMainFileSource, corruptMainFileDest)
+	build.CopyFile(corruptMainTempFileSource, corruptMainTempFileDest)
+
+	// Get all of the bytes of the temp file to verify later that the temp file
+	// is unchanged after saving.
+	file, err := os.Open(corruptMainTempFileDest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	originalTempFileData, err := ioutil.ReadAll(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	file.Close()
+
+	// Try saving a file when the main file has been corrupted. The save file
+	// should detect that the main file has been corrupted, and it should not
+	// touch the temp file. If the temp file changes, corruption has potentially
+	// been introduced.
+	err = SaveJSON(testMeta, newObj, corruptMainFileDest)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Check that the temp file is untouched.
+	file, err = os.Open(corruptMainTempFileDest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tempFileDataAfterBadSave, err := ioutil.ReadAll(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	file.Close()
+	if !bytes.Equal(tempFileDataAfterBadSave, originalTempFileData) {
+		t.Error("Temp file was changed after a correupted main file save")
+	}
+
+	// Save again. This time, because the full file is correct, it should
+	// overwrite the temp file.
+	err = SaveJSON(testMeta, newObj, corruptMainFileDest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	file, err = os.Open(corruptMainTempFileDest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tempFileDataAfterGoodSave, err := ioutil.ReadAll(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	file.Close()
+	if bytes.Equal(tempFileDataAfterGoodSave, originalTempFileData) {
+		t.Error("Temp file was not changed after a good save")
 	}
 }
