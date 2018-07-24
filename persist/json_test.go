@@ -183,6 +183,16 @@ func TestLoadJSONCorruptedFiles(t *testing.T) {
 		t.Error("persist mismatch")
 	}
 
+	// Try loading a file with a bad manual checksum.
+	err = LoadJSON(testMeta, &obj2, filepath.Join("testdata", "manual_bad.json"))
+	if err == nil {
+		t.Error("bad manual checksum should not have resulted in loading correctly")
+	}
+	err = LoadJSON(testMeta, &obj2, filepath.Join("testdata", "manual_bad2.json"))
+	if err == nil {
+		t.Error("bad manual checksum should not have resulted in loading correctly")
+	}
+
 	// Try loading a corrupted main file.
 	err = LoadJSON(testMeta, &obj2, filepath.Join("testdata", "corruptmain.json"))
 	if err != nil {
