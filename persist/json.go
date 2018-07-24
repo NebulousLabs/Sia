@@ -145,14 +145,14 @@ func readJSON(meta Metadata, object interface{}, filename string) error {
 		// Unable to decode a cryptographic checksum, try looking for the manual
 		// checksum.
 		var manualChecksum string
-		err := json.Unmarshal(remainingBytes[:8], &manualChecksum)
+		err := json.Unmarshal(remainingBytes[:9], &manualChecksum)
 		if err == nil && manualChecksum == "manual" {
 			if manualChecksum != "manual" {
 				return errors.New("loading a file with a bad checksum")
 			}
 			// Manual checksum is proper. Update the remaining data to exclude
 			// the manual checksum.
-			remainingBytes = remainingBytes[9:]
+			remainingBytes = remainingBytes[10:]
 		}
 	}
 
