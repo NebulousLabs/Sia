@@ -161,7 +161,7 @@ func TestLoadJSONCorruptedFiles(t *testing.T) {
 	// Try loading a file with a manual checksum.
 	err = LoadJSON(testMeta, &obj2, filepath.Join("testdata", "manual.json"))
 	if err != nil {
-		t.Error("bad checksum should have failed")
+		t.Error("loading file with a manual checksum should have succeeded")
 	}
 	// Verify equivalence.
 	if obj2.One != obj1.One {
