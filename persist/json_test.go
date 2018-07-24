@@ -193,6 +193,13 @@ func TestLoadJSONCorruptedFiles(t *testing.T) {
 		t.Error("bad manual checksum should not have resulted in loading correctly")
 	}
 
+	// Try loading a file where the main has been corrupted in a way that makes
+	// the file too short.
+	err = LoadJSON(testMeta, &obj2, filepath.Join("testdata", "corruptmainshort.json"))
+	if err != nil {
+		t.Error("short mainfile seems to be causing problems")
+	}
+
 	// Try loading a corrupted main file.
 	err = LoadJSON(testMeta, &obj2, filepath.Join("testdata", "corruptmain.json"))
 	if err != nil {

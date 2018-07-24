@@ -67,19 +67,23 @@ func verifyChecksum(filename string) bool {
 	// checksum will be the characters "manual\n" (9 characters). If neither
 	// decode correctly, it is assumed that there is no checksum at all.
 	var checksum crypto.Hash
-	err = json.Unmarshal(remainingBytes[:67], &checksum)
-	if err == nil {
-		// The checksum was read successfully. Return 'true' if the checksum
-		// matches the remaining data, and false otherwise.
-		return checksum == crypto.HashBytes(remainingBytes[68:])
+	if len(remainingBytes) >= 67 {
+		err = json.Unmarshal(remainingBytes[:67], &checksum)
+		if err == nil {
+			// The checksum was read successfully. Return 'true' if the checksum
+			// matches the remaining data, and false otherwise.
+			return checksum == crypto.HashBytes(remainingBytes[68:])
+		}
 	}
 
 	// The checksum was not read correctly, check if the next few bytes are
 	// the "manual" checksum.
 	var manualChecksum string
-	err = json.Unmarshal(remainingBytes[:8], &manualChecksum)
-	if err == nil && manualChecksum == "manual" {
-		return true
+	if len(remainingBytes) >= 9 {
+		err = json.Unmarshal(remainingBytes[:9], &manualChecksum)
+		if err == nil && manualChecksum == "manual" {
+			return true
+		}
 	}
 
 	// The checksum could not be decoded. Older versions of the file did not
@@ -134,29 +138,34 @@ func readJSON(meta Metadata, object interface{}, filename string) error {
 	// will be 67 bytes (quote, 64 byte checksum, quote, newline). A manual
 	// checksum will be the characters "manual\n" (9 characters). If neither
 	// decode correctly, it is assumed that there is no checksum at all.
-	var checksum crypto.Hash
-	err = json.Unmarshal(remainingBytes[:67], &checksum)
-	if err == nil {
-		if checksum != crypto.HashBytes(remainingBytes[68:]) {
+	checkManual := len(remainingBytes) >= 9
+	if len(remainingBytes) >= 67 {
+		var checksum crypto.Hash
+		err = json.Unmarshal(remainingBytes[:67], &checksum)
+		checkManual = checkManual && err != nil
+		if err == nil && checksum != crypto.HashBytes(remainingBytes[68:]) {
 			return errors.New("loading a file with a bad checksum")
+		} else if err == nil {
+			remainingBytes = remainingBytes[68:]
 		}
-		remainingBytes = remainingBytes[68:]
-	} else {
-		// Unable to decode a cryptographic checksum, try looking for the manual
-		// checksum.
+	}
+
+	// checkManual will be set to true so long as the remainingBytes is at least
+	// 9 bytes long, and also there was an error when parsing the checksum. The
+	// manual checksum is considered correct if the json unmarshalling parses
+	// correctly, and also the bytes match the string "manual".
+	if checkManual {
 		var manualChecksum string
 		err := json.Unmarshal(remainingBytes[:9], &manualChecksum)
-		if err == nil && manualChecksum == "manual" {
-			if manualChecksum != "manual" {
-				return errors.New("loading a file with a bad checksum")
-			}
-			// Manual checksum is proper. Update the remaining data to exclude
-			// the manual checksum.
+		if err == nil && manualChecksum != "manual" {
+			return errors.New("loading a file with a bad checksum")
+		} else if err == nil {
 			remainingBytes = remainingBytes[10:]
 		}
 	}
 
-	// Any valid checksum has been stripped off. There is also the case that no
+	// Any valid checksum has been stripped off. If there was an invalid
+	// checksum, an error has been returned. There is also the case that no
 	// checksum was written at all, which is ignored as a case - it's needed to
 	// preserve compatibility with previous persist files.
 
