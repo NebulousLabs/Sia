@@ -27,7 +27,7 @@ legacy-tests:
   script: 
     - make test-long pkgs="./node ./node/api ./node/api/server" run=.
     - cp -R /tmp/SiaTesting $CI_PROJECT_DIR/SiaTesting
-    - cp ./cover$CI_PROJECT_DIR/cover
+    - cp ./cover $CI_PROJECT_DIR/cover
 
 package-tests:
   stage: test
