@@ -23,11 +23,11 @@ legacy-tests:
     name: "SiaTesting-$CI_JOB_NAME"
     paths:
       - $CI_PROJECT_DIR/SiaTesting
-      - $CI_PROJECT_DIR/cover.out
+      - $CI_PROJECT_DIR/cover/cover.out
   script: 
     - make test-long pkgs="./node ./node/api ./node/api/server" run=.
     - cp -R /tmp/SiaTesting $CI_PROJECT_DIR/SiaTesting
-    - cp ./cover.out $CI_PROJECT_DIR/cover.out
+    - cp ./cover$CI_PROJECT_DIR/cover
 
 package-tests:
   stage: test
@@ -35,11 +35,11 @@ package-tests:
     name: "SiaTesting-$CI_JOB_NAME"
     paths:
       - $CI_PROJECT_DIR/SiaTesting
-      - $CI_PROJECT_DIR/cover.out
+      - $CI_PROJECT_DIR/cover/cover.out
   script: 
     - make test-long run=. pkgs="./build ./cmd/siac ./cmd/siad ./compatibility ./crypto ./encoding ./modules ./modules/consensus ./modules/explorer ./modules/gateway ./modules/host ./modules/host/contractmanager ./modules/renter ./modules/renter/contractor ./modules/renter/hostdb ./modules/renter/hostdb/hosttree ./modules/renter/proto ./modules/miner ./modules/wallet ./modules/transactionpool ./persist ./sync ./types"
     - cp -R /tmp/SiaTesting $CI_PROJECT_DIR/SiaTesting
-    - cp ./cover.out $CI_PROJECT_DIR/cover.out
+    - cp -R ./cover $CI_PROJECT_DIR/cover
 
 integration-tests:
   stage: test
@@ -47,11 +47,11 @@ integration-tests:
     name: "SiaTesting-$CI_JOB_NAME"
     paths:
       - $CI_PROJECT_DIR/SiaTesting
-      - $CI_PROJECT_DIR/cover.out
+      - $CI_PROJECT_DIR/cover/cover.out
   script:
     - make test-long run=. pkgs="./siatest ./siatest/consensus ./siatest/renter ./siatest/wallet"
     - cp -R /tmp/SiaTesting $CI_PROJECT_DIR/SiaTesting
-    - cp ./cover.out $CI_PROJECT_DIR/cover.out
+    - cp -R ./cover $CI_PROJECT_DIR/cover
 
 deploy:
   stage: deploy
