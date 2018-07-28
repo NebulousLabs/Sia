@@ -1,6 +1,6 @@
 package main
 
-// TODO: If you run siac from a non-existant directory, the abs() function does
+// TODO: If you run siac from a non-existent directory, the abs() function does
 // not handle this very gracefully.
 
 import (
@@ -721,7 +721,7 @@ func downloadprogress(siapath, destination string) error {
 		fmt.Printf("\rDownloading... %5.1f%% of %v, %v elapsed, %s    ", pct, filesizeUnits(int64(d.Filesize)), elapsed, speed)
 	}
 
-	// This code is unreachable, but the complier requires this to be here.
+	// This code is unreachable, but the compiler requires this to be here.
 	return errors.New("ERROR: download progress reached code that should not be reachable")
 }
 
