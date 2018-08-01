@@ -3,8 +3,8 @@ BUILD_TIME=$(shell date)
 GIT_REVISION=$(shell git rev-parse --short HEAD)
 GIT_DIRTY=$(shell git diff-index --quiet HEAD -- || echo "✗-")
 
-ldflags= -X gitlab.com/NebulousLabs/Sia/build.GitRevision=${GIT_DIRTY}${GIT_REVISION} \
--X "gitlab.com/NebulousLabs/Sia/build.BuildTime=${BUILD_TIME}"
+ldflags= -X github.com/NebulousLabs/Sia/build.GitRevision=${GIT_DIRTY}${GIT_REVISION} \
+-X "github.com/NebulousLabs/Sia/build.BuildTime=${BUILD_TIME}"
 
 # all will build and install release binaries
 all: release
@@ -13,19 +13,19 @@ all: release
 # Sia.
 dependencies:
 	# Consensus Dependencies
-	go get -u gitlab.com/NebulousLabs/demotemutex
-	go get -u gitlab.com/NebulousLabs/fastrand
-	go get -u gitlab.com/NebulousLabs/merkletree
-	go get -u gitlab.com/NebulousLabs/bolt
+	go get -u github.com/NebulousLabs/demotemutex
+	go get -u github.com/NebulousLabs/fastrand
+	go get -u github.com/NebulousLabs/merkletree
+	go get -u github.com/NebulousLabs/bolt
 	go get -u golang.org/x/crypto/blake2b
 	go get -u golang.org/x/crypto/ed25519
 	# Module + Daemon Dependencies
-	go get -u gitlab.com/NebulousLabs/entropy-mnemonics
-	go get -u gitlab.com/NebulousLabs/errors
-	go get -u gitlab.com/NebulousLabs/go-upnp
-	go get -u gitlab.com/NebulousLabs/ratelimit
-	go get -u gitlab.com/NebulousLabs/threadgroup
-	go get -u gitlab.com/NebulousLabs/writeaheadlog
+	go get -u github.com/NebulousLabs/entropy-mnemonics
+	go get -u github.com/NebulousLabs/errors
+	go get -u github.com/NebulousLabs/go-upnp
+	go get -u github.com/NebulousLabs/ratelimit
+	go get -u github.com/NebulousLabs/threadgroup
+	go get -u github.com/NebulousLabs/writeaheadlog
 	go get -u github.com/klauspost/reedsolomon
 	go get -u github.com/julienschmidt/httprouter
 	go get -u github.com/inconshreveable/go-update
@@ -38,7 +38,7 @@ dependencies:
 	go install -race std
 	go get -u github.com/client9/misspell/cmd/misspell
 	go get -u github.com/golang/lint/golint
-	go get -u gitlab.com/NebulousLabs/glyphcheck
+	go get -u github.com/NebulousLabs/glyphcheck
 
 # pkgs changes which packages the makefile calls operate on. run changes which
 # tests are run during testing.
@@ -83,10 +83,6 @@ release:
 release-race:
 	go install -race -tags='netgo' -a -ldflags='-s -w $(ldflags)' $(pkgs)
 
-# deploy builds release binaries for every platform.
-deploy:
-	./deploy.sh
-
 # clean removes all directories that get automatically created during
 # development.
 clean:
@@ -97,11 +93,9 @@ test:
 test-v:
 	go test -race -v -short -tags='debug testing netgo' -timeout=15s $(pkgs) -run=$(run)
 test-long: clean fmt vet lint
-	@mkdir -p cover
-	go test --coverprofile='./cover/cover.out' -v -race -tags='testing debug netgo' -timeout=1200s $(pkgs) -run=$(run)
+	go test -v -race -tags='testing debug netgo' -timeout=500s $(pkgs) -run=$(run)
 test-vlong: clean fmt vet lint
-	@mkdir -p cover
-	go test --coverprofile='./cover/cover.out' -v -race -tags='testing debug vlong netgo' -timeout=5000s $(pkgs) -run=$(run)
+	go test -v -race -tags='testing debug vlong netgo' -timeout=5000s $(pkgs) -run=$(run)
 test-cpu:
 	go test -v -tags='testing debug netgo' -timeout=500s -cpuprofile cpu.prof $(pkgs) -run=$(run)
 test-mem:

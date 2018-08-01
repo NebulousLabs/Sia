@@ -7,7 +7,7 @@ import (
 	"sync"
 	"testing"
 
-	"gitlab.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/modules"
 )
 
 // TestGrowStorageFolder checks that a storage folder can be successfully

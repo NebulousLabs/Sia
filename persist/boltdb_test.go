@@ -3,12 +3,13 @@ package persist
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
+	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/fastrand"
 	"github.com/coreos/bbolt"
-	"gitlab.com/NebulousLabs/Sia/build"
-	"gitlab.com/NebulousLabs/fastrand"
 )
 
 // testInputs and testFilenames are global variables because most tests require
@@ -194,6 +195,49 @@ func TestOpenDatabase(t *testing.T) {
 		if err != nil {
 			t.Errorf("removing database file failed for metadata %v, filename %v; error was %v", in.md, dbFilename, err)
 			continue
+		}
+	}
+}
+
+// TestErrPermissionOpenDatabase tests calling OpenDatabase on a database file
+// with the wrong filemode (< 0600), which should result in an os.ErrPermission
+// error.
+func TestErrPermissionOpenDatabase(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("can't reproduce on Windows")
+	}
+
+	const (
+		dbHeader   = "Fake Header"
+		dbVersion  = "0.0.0"
+		dbFilename = "Fake Filename"
+	)
+	testDir := build.TempDir(persistDir, t.Name())
+	err := os.MkdirAll(testDir, 0700)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dbFilepath := filepath.Join(testDir, dbFilename)
+	badFileModes := []os.FileMode{0000, 0001, 0002, 0003, 0004, 0005, 0010, 0040, 0060, 0105, 0110, 0126, 0130, 0143, 0150, 0166, 0170, 0200, 0313, 0470, 0504, 0560, 0566, 0577}
+
+	// Make sure OpenDatabase returns a permissions error for each of the modes
+	// in badFileModes.
+	for _, mode := range badFileModes {
+		// Create a file named dbFilename in directory testDir with the wrong
+		// permissions (mode < 0600).
+		_, err := os.OpenFile(dbFilepath, os.O_RDWR|os.O_CREATE, mode)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// OpenDatabase should return a permissions error because the database
+		// mode is less than 0600.
+		_, err = OpenDatabase(Metadata{dbHeader, dbVersion}, dbFilepath)
+		if !os.IsPermission(err) {
+			t.Errorf("OpenDatabase failed to return expected error when called on a database with the wrong permissions (%o instead of >= 0600);\n wanted:\topen %v: permission denied\n got:\t\t%v", mode, dbFilepath, err)
+		}
+		err = os.Remove(dbFilepath)
+		if err != nil {
+			t.Error(err)
 		}
 	}
 }

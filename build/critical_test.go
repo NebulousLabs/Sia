@@ -7,7 +7,7 @@ import (
 // TestCritical checks that a panic is called in debug mode.
 func TestCritical(t *testing.T) {
 	k0 := "critical test killstring"
-	killstring := "Critical error: critical test killstring\nPlease submit a bug report here: https://gitlab.com/NebulousLabs/Sia/issues\n"
+	killstring := "Critical error: critical test killstring\nPlease submit a bug report here: https://github.com/NebulousLabs/Sia/issues\n"
 	defer func() {
 		r := recover()
 		if r != killstring {
@@ -23,7 +23,7 @@ func TestCriticalVariadic(t *testing.T) {
 	k1 := "critical"
 	k2 := "test"
 	k3 := "killstring"
-	killstring := "Critical error: variadic critical test killstring\nPlease submit a bug report here: https://gitlab.com/NebulousLabs/Sia/issues\n"
+	killstring := "Critical error: variadic critical test killstring\nPlease submit a bug report here: https://github.com/NebulousLabs/Sia/issues\n"
 	defer func() {
 		r := recover()
 		if r != killstring {

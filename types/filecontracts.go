@@ -4,7 +4,7 @@ package types
 // contracts.
 
 import (
-	"gitlab.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/crypto"
 )
 
 var (

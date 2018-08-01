@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"gitlab.com/NebulousLabs/Sia/build"
-	"gitlab.com/NebulousLabs/fastrand"
+	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/fastrand"
 )
 
 // SafeReadAt is a wrapper for ReadAt that recovers from a potential panic and

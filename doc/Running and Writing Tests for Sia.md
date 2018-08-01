@@ -127,7 +127,7 @@ go test -v -race -tags='testing debug' -timeout=300s ./persist -run=Test
 === RUN   TestRelativePathSafeFile
 --- PASS: TestRelativePathSafeFile (0.00s)
 PASS
-ok  	gitlab.com/NebulousLabs/Sia/persist	1.485s
+ok  	github.com/NebulousLabs/Sia/persist	1.485s
 $
 ``` 
 
@@ -243,14 +243,14 @@ And feel free to ask questions on the [#core-dev channel][discord] on the Sia Di
 Odds are, someone else is wondering the same thing.
 
 [pkg/testing]: https://golang.org/pkg/testing/
-[makefile]: https://gitlab.com/NebulousLabs/Sia/blob/master/Makefile
+[makefile]: https://github.com/NebulousLabs/Sia/blob/master/Makefile
 [luke]: https://gist.github.com/lukechampine/6418449
-[guide]: https://gitlab.com/NebulousLabs/Sia/blob/master/doc/Guide%20to%20Contributing%20to%20Sia.md
-[developers]: https://gitlab.com/NebulousLabs/Sia/blob/master/doc/Developers.md
+[guide]: https://github.com/NebulousLabs/Sia/blob/master/doc/Guide%20to%20Contributing%20to%20Sia.md
+[developers]: https://github.com/NebulousLabs/Sia/blob/master/doc/Developers.md
 [table]: http://dave.cheney.net/2013/06/09/writing-table-driven-tests-in-go
-[boltdb_test.go]: https://gitlab.com/NebulousLabs/Sia/blob/master/persist/boltdb_test.go
+[boltdb_test.go]: https://github.com/NebulousLabs/Sia/blob/master/persist/boltdb_test.go
 [cheney-benchmarks]: http://dave.cheney.net/2013/06/30/how-to-write-benchmarks-in-go
 [pkg/testing]: https://golang.org/pkg/testing/
 [discord]: https://discord.gg/sia
-[parse_test]: https://gitlab.com/NebulousLabs/Sia/blob/master/siac/parse_test.go
+[parse_test]: https://github.com/NebulousLabs/Sia/blob/master/siac/parse_test.go
 [global]: http://c2.com/cgi/wiki?GlobalVariablesAreBad

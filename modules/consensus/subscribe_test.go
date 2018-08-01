@@ -4,8 +4,8 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/NebulousLabs/Sia/modules"
 	bolt "github.com/coreos/bbolt"
-	"gitlab.com/NebulousLabs/Sia/modules"
 )
 
 // mockSubscriber receives and holds changes to the consensus set, remembering

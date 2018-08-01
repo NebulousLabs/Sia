@@ -14,18 +14,18 @@ import (
 	"testing"
 	"time"
 
-	"gitlab.com/NebulousLabs/Sia/build"
-	"gitlab.com/NebulousLabs/Sia/crypto"
-	"gitlab.com/NebulousLabs/Sia/modules"
-	"gitlab.com/NebulousLabs/Sia/modules/renter"
-	"gitlab.com/NebulousLabs/Sia/node"
-	"gitlab.com/NebulousLabs/Sia/node/api"
-	"gitlab.com/NebulousLabs/Sia/node/api/client"
-	"gitlab.com/NebulousLabs/Sia/siatest"
-	"gitlab.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/modules/renter"
+	"github.com/NebulousLabs/Sia/node"
+	"github.com/NebulousLabs/Sia/node/api"
+	"github.com/NebulousLabs/Sia/node/api/client"
+	"github.com/NebulousLabs/Sia/siatest"
+	"github.com/NebulousLabs/Sia/types"
 
-	"gitlab.com/NebulousLabs/errors"
-	"gitlab.com/NebulousLabs/fastrand"
+	"github.com/NebulousLabs/errors"
+	"github.com/NebulousLabs/fastrand"
 )
 
 // TestRenter executes a number of subtests using the same TestGroup to
@@ -42,7 +42,7 @@ func TestRenter(t *testing.T) {
 		Renters: 1,
 		Miners:  1,
 	}
-	tg, err := siatest.NewGroupFromTemplate(renterTestDir(t.Name()), groupParams)
+	tg, err := siatest.NewGroupFromTemplate(groupParams)
 	if err != nil {
 		t.Fatal("Failed to create group: ", err)
 	}
@@ -452,9 +452,7 @@ func testSingleFileGet(t *testing.T, tg *siatest.TestGroup) {
 		if err != nil {
 			t.Fatal("Failed to request single file", err)
 		}
-		if !reflect.DeepEqual(f, file) {
-			t.Log(f)
-			t.Log(file)
+		if file != f {
 			t.Fatal("Single file queries does not match file previously requested.")
 		}
 	}
@@ -605,7 +603,7 @@ func TestRenterInterrupt(t *testing.T) {
 		Hosts:  5,
 		Miners: 1,
 	}
-	tg, err := siatest.NewGroupFromTemplate(renterTestDir(t.Name()), groupParams)
+	tg, err := siatest.NewGroupFromTemplate(groupParams)
 	if err != nil {
 		t.Fatal("Failed to create group: ", err)
 	}
@@ -664,7 +662,10 @@ func testUploadInterruptedBeforeSendingRevision(t *testing.T, tg *siatest.TestGr
 // testDownloadInterrupted interrupts a download using the provided dependencies.
 func testDownloadInterrupted(t *testing.T, tg *siatest.TestGroup, deps *siatest.DependencyInterruptOnceOnKeyword) {
 	// Add Renter
-	testDir := renterTestDir(t.Name())
+	testDir, err := siatest.TestDir(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
 	renterTemplate := node.Renter(testDir + "/renter")
 	renterTemplate.ContractSetDeps = deps
 	nodes, err := tg.AddNodes(renterTemplate)
@@ -723,7 +724,10 @@ func testDownloadInterrupted(t *testing.T, tg *siatest.TestGroup, deps *siatest.
 // and makes sure that this doesn't corrupt the contract.
 func testUploadInterrupted(t *testing.T, tg *siatest.TestGroup, deps *siatest.DependencyInterruptOnceOnKeyword) {
 	// Add Renter
-	testDir := renterTestDir(t.Name())
+	testDir, err := siatest.TestDir(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
 	renterTemplate := node.Renter(testDir + "/renter")
 	renterTemplate.ContractSetDeps = deps
 	nodes, err := tg.AddNodes(renterTemplate)
@@ -802,7 +806,7 @@ func TestRedundancyReporting(t *testing.T) {
 		Renters: 1,
 		Miners:  1,
 	}
-	tg, err := siatest.NewGroupFromTemplate(renterTestDir(t.Name()), groupParams)
+	tg, err := siatest.NewGroupFromTemplate(groupParams)
 	if err != nil {
 		t.Fatal("Failed to create group: ", err)
 	}
@@ -899,16 +903,17 @@ func TestRenewFailing(t *testing.T) {
 		t.SkipNow()
 	}
 	t.Parallel()
-
-	// Create testing directory.
-	testDir := renterTestDir(t.Name())
+	renterDir, err := siatest.TestDir(filepath.Join(t.Name(), "renter"))
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Create a group for the subtests
 	groupParams := siatest.GroupParams{
 		Hosts:  3,
 		Miners: 1,
 	}
-	tg, err := siatest.NewGroupFromTemplate(testDir, groupParams)
+	tg, err := siatest.NewGroupFromTemplate(groupParams)
 	if err != nil {
 		t.Fatal("Failed to create group: ", err)
 	}
@@ -920,7 +925,7 @@ func TestRenewFailing(t *testing.T) {
 
 	// Add a renter with a custom allowance to give it plenty of time to renew
 	// the contract later.
-	renterParams := node.Renter(filepath.Join(testDir, "renter"))
+	renterParams := node.Renter(renterDir)
 	renterParams.Allowance = siatest.DefaultAllowance
 	renterParams.Allowance.Hosts = uint64(len(tg.Hosts()) - 1)
 	renterParams.Allowance.Period = 100
@@ -1067,7 +1072,7 @@ func TestRenterCancelAllowance(t *testing.T) {
 		Renters: 1,
 		Miners:  1,
 	}
-	tg, err := siatest.NewGroupFromTemplate(renterTestDir(t.Name()), groupParams)
+	tg, err := siatest.NewGroupFromTemplate(groupParams)
 	if err != nil {
 		t.Fatal("Failed to create group: ", err)
 	}
@@ -1223,7 +1228,7 @@ func TestRenterContractEndHeight(t *testing.T) {
 		Renters: 1,
 		Miners:  1,
 	}
-	tg, err := siatest.NewGroupFromTemplate(renterTestDir(t.Name()), groupParams)
+	tg, err := siatest.NewGroupFromTemplate(groupParams)
 	if err != nil {
 		t.Fatal("Failed to create group: ", err)
 	}
@@ -1245,25 +1250,6 @@ func TestRenterContractEndHeight(t *testing.T) {
 	period := rg.Settings.Allowance.Period
 	renewWindow := rg.Settings.Allowance.RenewWindow
 	numRenewals := 0
-
-	// Check if the current period was set in the past
-	cg, err := r.ConsensusGet()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if currentPeriodStart > cg.Height-renewWindow {
-		t.Fatalf(`Current period not set in the past as expected.
-		CP: %v
-		BH: %v
-		RW: %v
-		`, currentPeriodStart, cg.Height, renewWindow)
-	}
-
-	// Get contracts
-	rc, err := r.RenterContractsGet()
-	if err != nil {
-		t.Fatal("Could not get renter contracts:", err)
-	}
 
 	// Confirm Contracts were created as expected.  There should be 2 active
 	// contracts and no inactive or expired contracts
@@ -1291,19 +1277,18 @@ func TestRenterContractEndHeight(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	rc, err = r.RenterContractsGet()
+	rc, err := r.RenterContractsGet()
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Confirm contract end heights were set properly
 	for _, c := range rc.ActiveContracts {
-		if c.EndHeight != currentPeriodStart+period+renewWindow {
+		if c.EndHeight != currentPeriodStart+period {
 			t.Log("Endheight:", c.EndHeight)
 			t.Log("Allowance Period:", period)
-			t.Log("Renew Window:", renewWindow)
 			t.Log("Current Period:", currentPeriodStart)
-			t.Fatal("Contract endheight not set to Current period + Allowance Period + Renew Window")
+			t.Fatal("Contract endheight not set to Current period + Allowance Period")
 		}
 	}
 
@@ -1349,12 +1334,12 @@ func TestRenterContractEndHeight(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, c := range rc.ActiveContracts {
-		if c.EndHeight != currentPeriodStart+(2*period)+renewWindow && c.GoodForRenew {
+		if c.EndHeight != currentPeriodStart+(2*period)-renewWindow && c.GoodForRenew {
 			t.Log("Endheight:", c.EndHeight)
 			t.Log("Allowance Period:", period)
 			t.Log("Renew Window:", renewWindow)
 			t.Log("Current Period:", currentPeriodStart)
-			t.Fatal("Contract endheight not set to Current period + 2 * Allowance Period + Renew Window")
+			t.Fatal("Contract endheight not set to Current period + 2 * Allowance Period - Renew Window")
 		}
 	}
 
@@ -1396,7 +1381,7 @@ func TestRenterContractsEndpoint(t *testing.T) {
 		Renters: 1,
 		Miners:  1,
 	}
-	tg, err := siatest.NewGroupFromTemplate(renterTestDir(t.Name()), groupParams)
+	tg, err := siatest.NewGroupFromTemplate(groupParams)
 	if err != nil {
 		t.Fatal("Failed to create group: ", err)
 	}
@@ -1543,7 +1528,7 @@ func TestRenterContractsEndpoint(t *testing.T) {
 			return err
 		}
 		if len(rc.ActiveContracts) != len(tg.Hosts()) {
-			return fmt.Errorf("waiting for active contracts to form")
+			return errors.New("Waiting for active contracts to form")
 		}
 		return nil
 	})
@@ -1626,12 +1611,15 @@ func TestRenterPersistData(t *testing.T) {
 	t.Parallel()
 
 	// Get test directory
-	testDir := renterTestDir(t.Name())
+	testdir, err := siatest.TestDir(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Copying legacy file to test directory
-	renterDir := filepath.Join(testDir, "renter")
+	renterDir := filepath.Join(testdir, "renter")
 	destination := filepath.Join(renterDir, "renter.json")
-	err := os.MkdirAll(renterDir, 0700)
+	err = os.MkdirAll(renterDir, 0700)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1655,7 +1643,7 @@ func TestRenterPersistData(t *testing.T) {
 	}
 
 	// Create new node from legacy renter.json persistence file
-	r, err := siatest.NewNode(node.AllModules(testDir))
+	r, err := siatest.NewNode(node.AllModules(testdir))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1753,7 +1741,7 @@ func TestRenterResetAllowance(t *testing.T) {
 		Renters: 1,
 		Miners:  1,
 	}
-	tg, err := siatest.NewGroupFromTemplate(renterTestDir(t.Name()), groupParams)
+	tg, err := siatest.NewGroupFromTemplate(groupParams)
 	if err != nil {
 		t.Fatal("Failed to create group: ", err)
 	}
@@ -1847,8 +1835,7 @@ func TestRenterSpendingReporting(t *testing.T) {
 		Hosts:  2,
 		Miners: 1,
 	}
-	testDir := renterTestDir(t.Name())
-	tg, err := siatest.NewGroupFromTemplate(testDir, groupParams)
+	tg, err := siatest.NewGroupFromTemplate(groupParams)
 	if err != nil {
 		t.Fatal("Failed to create group: ", err)
 	}
@@ -1859,7 +1846,11 @@ func TestRenterSpendingReporting(t *testing.T) {
 	}()
 
 	// Add a Renter node
-	renterParams := node.Renter(filepath.Join(testDir, "renter"))
+	renterDir, err := siatest.TestDir(filepath.Join(t.Name(), "renter"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	renterParams := node.Renter(renterDir)
 	renterParams.SkipSetAllowance = true
 	nodes, err := tg.AddNodes(renterParams)
 	if err != nil {
@@ -2260,81 +2251,6 @@ func TestRenterSpendingReporting(t *testing.T) {
 	}
 }
 
-// TestZeroByteFile tests uploading and downloading a 0 and 1 byte file
-func TestZeroByteFile(t *testing.T) {
-	if testing.Short() {
-		t.SkipNow()
-	}
-	t.Parallel()
-
-	// Create a testgroup, creating without renter so the renter's
-	// initial balance can be obtained
-	groupParams := siatest.GroupParams{
-		Hosts:   2,
-		Miners:  1,
-		Renters: 1,
-	}
-	testDir := renterTestDir(t.Name())
-	tg, err := siatest.NewGroupFromTemplate(testDir, groupParams)
-	if err != nil {
-		t.Fatal("Failed to create group: ", err)
-	}
-	defer func() {
-		if err := tg.Close(); err != nil {
-			t.Fatal(err)
-		}
-	}()
-
-	// Grab renter
-	r := tg.Renters()[0]
-
-	// Create 0 and 1 byte file
-	zeroByteFile := 0
-	oneByteFile := 1
-
-	// Test uploading 0 byte file
-	dataPieces := uint64(1)
-	parityPieces := uint64(len(tg.Hosts())) - dataPieces
-	redundancy := float64((dataPieces + parityPieces) / dataPieces)
-	_, zeroRF, err := r.UploadNewFile(zeroByteFile, dataPieces, parityPieces)
-	if err != nil {
-		t.Fatal(err)
-	}
-	// Get renter files, should only be 0 byte file
-	rf, err := r.RenterFilesGet()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(rf.Files) != 1 {
-		t.Fatalf("Expected 1 file, got %v", len(rf.Files))
-	}
-	// Check redundancy and upload progress
-	if rf.Files[0].Redundancy != redundancy {
-		t.Fatalf("Expected redundancy to be %v, got %v", redundancy, rf.Files[0].Redundancy)
-	}
-	if rf.Files[0].UploadProgress != 100 {
-		t.Fatalf("Expected upload progress to be 100, got %v", rf.Files[0].UploadProgress)
-	}
-
-	// Test uploading 1 byte file
-	_, oneRF, err := r.UploadNewFileBlocking(oneByteFile, dataPieces, parityPieces)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Test downloading 0 byte file
-	_, err = r.DownloadToDisk(zeroRF, false)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Test downloading 1 byte file
-	_, err = r.DownloadToDisk(oneRF, false)
-	if err != nil {
-		t.Fatal(err)
-	}
-}
-
 // The following are helper functions for the renter tests
 
 // checkBalanceVsSpending checks the renters confirmed siacoin balance in their
@@ -2569,19 +2485,10 @@ func checkRenewedContracts(renewedContracts []api.RenterContract) error {
 func renewContractsByRenewWindow(renter *siatest.TestNode, tg *siatest.TestGroup) error {
 	rg, err := renter.RenterGet()
 	if err != nil {
-		return err
+		return errors.AddContext(err, "failed to get RenterGet")
 	}
-	cg, err := renter.ConsensusGet()
-	if err != nil {
-		return err
-	}
-	rc, err := renter.RenterContractsGet()
-	if err != nil {
-		return err
-	}
-	blocksToMine := rc.ActiveContracts[0].EndHeight - rg.Settings.Allowance.RenewWindow - cg.Height
 	m := tg.Miners()[0]
-	for i := 0; i < int(blocksToMine); i++ {
+	for i := 0; i < int(rg.Settings.Allowance.Period-rg.Settings.Allowance.RenewWindow); i++ {
 		if err = m.MineBlock(); err != nil {
 			return err
 		}
@@ -2599,7 +2506,7 @@ func renewContractsByRenewWindow(renter *siatest.TestNode, tg *siatest.TestGroup
 func renewContractsBySpending(renter *siatest.TestNode, tg *siatest.TestGroup) (startingUploadSpend types.Currency, err error) {
 	// Renew contracts by running out of funds
 	// Set upload price to max price
-	maxStoragePrice := types.SiacoinPrecision.Mul64(3e6).Div(modules.BlockBytesPerMonthTerabyte) // 30k SC / TB / Month
+	maxStoragePrice := types.SiacoinPrecision.Mul64(30e5).Div(modules.BlockBytesPerMonthTerabyte) // 30k SC / TB / Month
 	maxUploadPrice := maxStoragePrice.Mul64(30 * 4320)
 	hosts := tg.Hosts()
 	for _, h := range hosts {

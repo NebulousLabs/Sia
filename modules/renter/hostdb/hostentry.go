@@ -3,8 +3,8 @@ package hostdb
 import (
 	"math"
 
-	"gitlab.com/NebulousLabs/Sia/modules"
-	"gitlab.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // updateHostDBEntry updates a HostDBEntries's historic interactions if more

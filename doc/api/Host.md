@@ -420,7 +420,7 @@ to be called once.
 
 Note that even after the host has been announced, it will not accept new 
 contracts unless configured to do so. To configure the host to accept 
-contracts, see [/host](https://gitlab.com/NebulousLabs/Sia/blob/master/doc/api/Host.md#host-post).
+contracts, see [/host](https://github.com/NebulousLabs/Sia/blob/master/doc/api/Host.md#host-post).
 
 ###### Query String Parameters
 ```

@@ -4,7 +4,7 @@ import (
 	"errors"
 	"reflect"
 
-	"gitlab.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/modules"
 )
 
 var (
@@ -63,11 +63,9 @@ func (c *Contractor) SetAllowance(a modules.Allowance) error {
 	c.log.Println("INFO: setting allowance to", a)
 	c.mu.Lock()
 	// set the current period to the blockheight if the existing allowance is
-	// empty. the current period is set in the past by the renew window to make sure
-	// the first period aligns with the first period contracts in the same way
-	// that future periods align with contracts
+	// empty
 	if reflect.DeepEqual(c.allowance, modules.Allowance{}) {
-		c.currentPeriod = c.blockHeight - a.RenewWindow
+		c.currentPeriod = c.blockHeight
 	}
 	c.allowance = a
 	err := c.saveSync()

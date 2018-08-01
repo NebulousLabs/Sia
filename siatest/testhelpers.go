@@ -1,6 +1,6 @@
 package siatest
 
-import "gitlab.com/NebulousLabs/fastrand"
+import "github.com/NebulousLabs/fastrand"
 
 // Fuzz returns 0, 1 or -1. This can be used to test for random off-by-one
 // errors in the code. For example fuzz can be used to create a File that is

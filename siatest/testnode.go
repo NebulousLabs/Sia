@@ -1,12 +1,12 @@
 package siatest
 
 import (
-	"gitlab.com/NebulousLabs/Sia/node"
-	"gitlab.com/NebulousLabs/Sia/node/api/client"
-	"gitlab.com/NebulousLabs/Sia/node/api/server"
-	"gitlab.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/Sia/node"
+	"github.com/NebulousLabs/Sia/node/api/client"
+	"github.com/NebulousLabs/Sia/node/api/server"
+	"github.com/NebulousLabs/Sia/types"
 
-	"gitlab.com/NebulousLabs/errors"
+	"github.com/NebulousLabs/errors"
 )
 
 // TestNode is a helper struct for testing that contains a server and a client

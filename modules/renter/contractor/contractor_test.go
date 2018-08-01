@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"gitlab.com/NebulousLabs/Sia/build"
-	"gitlab.com/NebulousLabs/Sia/modules"
-	"gitlab.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // newStub is used to test the New function. It implements all of the contractor's
@@ -402,96 +402,6 @@ func TestIntegrationSetAllowance(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatal(err)
-	}
-}
-
-// TestLinkedContracts tests that the contractors maps are updated correctly
-// when renewing contracts
-func TestLinkedContracts(t *testing.T) {
-	if testing.Short() {
-		t.SkipNow()
-	}
-	t.Parallel()
-
-	// create testing trio
-	_, c, m, err := newTestingTrio(t.Name())
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Create allowance
-	a := modules.Allowance{
-		Funds:       types.SiacoinPrecision.Mul64(100),
-		Hosts:       1,
-		Period:      20,
-		RenewWindow: 10,
-	}
-	err = c.SetAllowance(a)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Wait for Contract creation
-	err = build.Retry(200, 100*time.Millisecond, func() error {
-		if len(c.Contracts()) != 1 {
-			return errors.New("no contract created")
-		}
-		return nil
-	})
-	if err != nil {
-		t.Error(err)
-	}
-
-	// Confirm that maps are empty
-	if len(c.renewedFrom) != 0 {
-		t.Fatal("renewedFrom map should be empty")
-	}
-	if len(c.renewedTo) != 0 {
-		t.Fatal("renewedTo map should be empty")
-	}
-
-	// Mine blocks to renew contract
-	for i := types.BlockHeight(0); i < c.allowance.Period-c.allowance.RenewWindow; i++ {
-		_, err = m.AddBlock()
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
-
-	// Confirm Contracts got renewed
-	err = build.Retry(200, 100*time.Millisecond, func() error {
-		if len(c.Contracts()) != 1 {
-			return errors.New("no contract")
-		}
-		if len(c.OldContracts()) != 1 {
-			return errors.New("no old contract")
-		}
-		return nil
-	})
-	if err != nil {
-		t.Error(err)
-	}
-
-	// Confirm maps are updated as expected
-	if len(c.renewedFrom) != 1 {
-		t.Fatalf("renewedFrom map should have 1 entry but has %v", len(c.renewedFrom))
-	}
-	if len(c.renewedTo) != 1 {
-		t.Fatalf("renewedTo map should have 1 entry but has %v", len(c.renewedTo))
-	}
-	if c.renewedFrom[c.Contracts()[0].ID] != c.OldContracts()[0].ID {
-		t.Fatalf(`Map assignment incorrect,
-		expected:
-		map[%v:%v]
-		got:
-		%v`, c.Contracts()[0].ID, c.OldContracts()[0].ID, c.renewedFrom)
-	}
-	if c.renewedTo[c.OldContracts()[0].ID] != c.Contracts()[0].ID {
-		t.Fatalf(`Map assignment incorrect,
-		expected:
-		map[%v:%v]
-		got:
-		%v`, c.OldContracts()[0].ID, c.Contracts()[0].ID, c.renewedTo)
 	}
 }
 

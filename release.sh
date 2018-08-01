@@ -25,7 +25,7 @@ if [ $keysum != "735320b4698010500d230c487e970e12776e88f33ad777ab380a493691dadb1
 fi
 
 # setup build-time vars
-ldflags="-s -w -X 'gitlab.com/NebulousLabs/Sia/build.GitRevision=`git rev-parse --short HEAD`' -X 'gitlab.com/NebulousLabs/Sia/build.BuildTime=`date`'"
+ldflags="-s -w -X 'github.com/NebulousLabs/Sia/build.GitRevision=`git rev-parse --short HEAD`' -X 'github.com/NebulousLabs/Sia/build.BuildTime=`date`'"
 
 for os in darwin linux windows; do
 	echo Packaging ${os}...

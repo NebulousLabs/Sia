@@ -1,18 +1,19 @@
 package siatest
 
 import (
-	"encoding/hex"
 	"fmt"
+	"math"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"time"
 
-	"gitlab.com/NebulousLabs/Sia/crypto"
-	"gitlab.com/NebulousLabs/Sia/modules"
-	"gitlab.com/NebulousLabs/Sia/node/api"
+	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/node/api"
 
-	"gitlab.com/NebulousLabs/errors"
-	"gitlab.com/NebulousLabs/fastrand"
+	"github.com/NebulousLabs/errors"
+	"github.com/NebulousLabs/fastrand"
 )
 
 // DownloadToDisk downloads a previously uploaded file. The file will be downloaded
@@ -23,15 +24,14 @@ func (tn *TestNode) DownloadToDisk(rf *RemoteFile, async bool) (*LocalFile, erro
 		return nil, errors.AddContext(err, "failed to retrieve FileInfo")
 	}
 	// Create a random destination for the download
-	fileName := fmt.Sprintf("%dbytes-%s", fi.Filesize, hex.EncodeToString(fastrand.Bytes(4)))
-	dest := filepath.Join(tn.downloadsDir(), fileName)
+	fileName := strconv.Itoa(fastrand.Intn(math.MaxInt32))
+	dest := filepath.Join(SiaTestingDir, fileName)
 	if err := tn.RenterDownloadGet(rf.siaPath, dest, 0, fi.Filesize, async); err != nil {
 		return nil, errors.AddContext(err, "failed to download file")
 	}
 	// Create the TestFile
 	lf := &LocalFile{
 		path:     dest,
-		size:     int(fi.Filesize),
 		checksum: rf.checksum,
 	}
 	// If we download the file asynchronously we are done
@@ -186,7 +186,7 @@ func (tn *TestNode) Upload(lf *LocalFile, dataPieces, parityPieces uint64) (*Rem
 // UploadNewFile initiates the upload of a filesize bytes large file.
 func (tn *TestNode) UploadNewFile(filesize int, dataPieces uint64, parityPieces uint64) (*LocalFile, *RemoteFile, error) {
 	// Create file for upload
-	localFile, err := tn.NewFile(filesize)
+	localFile, err := NewFile(filesize)
 	if err != nil {
 		return nil, nil, errors.AddContext(err, "failed to create file")
 	}
