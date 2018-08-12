@@ -1,8 +1,8 @@
 # [![Sia Logo](http://sia.tech/img/svg/sia-green-logo.svg)](http://sia.tech) v1.3.3 (Capricorn)
 
 [![Build Status](https://travis-ci.org/NebulousLabs/Sia.svg?branch=master)](https://travis-ci.org/NebulousLabs/Sia)
-[![GoDoc](https://godoc.org/gitlab.com/NebulousLabs/Sia?status.svg)](https://godoc.org/gitlab.com/NebulousLabs/Sia)
-[![Go Report Card](https://goreportcard.com/badge/gitlab.com/NebulousLabs/Sia)](https://goreportcard.com/report/gitlab.com/NebulousLabs/Sia)
+[![GoDoc](https://godoc.org/github.com/NebulousLabs/Sia?status.svg)](https://godoc.org/github.com/NebulousLabs/Sia)
+[![Go Report Card](https://goreportcard.com/badge/github.com/NebulousLabs/Sia)](https://goreportcard.com/report/github.com/NebulousLabs/Sia)
 
 Sia is a new decentralized cloud storage platform that radically alters the
 landscape of cloud storage. By leveraging smart contracts, client-side
@@ -70,7 +70,7 @@ as a sole means of storing important data.
 This release comes with 2 binaries, siad and siac. siad is a background
 service, or "daemon," that runs the Sia protocol and exposes an HTTP API on
 port 9980. siac is a command-line client that can be used to interact with
-siad in a user-friendly way. There is also a graphical client, [Sia-UI](https://gitlab.com/NebulousLabs/Sia-UI), which
+siad in a user-friendly way. There is also a graphical client, [Sia-UI](https://github.com/NebulousLabs/Sia-UI), which
 is the preferred way of using Sia for most users. For interested developers,
 the siad API is documented [here](doc/API.md).
 
@@ -92,7 +92,7 @@ To build from source, [Go 1.10 must be installed](https://golang.org/doc/install
 on the system. Make sure your `$GOPATH` is set, and then simply use `go get`:
 
 ```
-go get -u gitlab.com/NebulousLabs/Sia/...
+go get -u github.com/NebulousLabs/Sia/...
 ```
 
 This will download the Sia repo to your `$GOPATH/src` folder and install the

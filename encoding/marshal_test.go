@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"gitlab.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/build"
 )
 
 // dummy types to test encoding

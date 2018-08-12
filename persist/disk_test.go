@@ -8,9 +8,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"gitlab.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/build"
 
-	"gitlab.com/NebulousLabs/fastrand"
+	"github.com/NebulousLabs/fastrand"
 )
 
 // BenchmarkWrite512MiB checks how long it takes to write 512MiB sequentially.

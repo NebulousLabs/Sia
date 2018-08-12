@@ -5,10 +5,10 @@ import (
 	"io"
 	"time"
 
-	"gitlab.com/NebulousLabs/Sia/crypto"
-	"gitlab.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/types"
 
-	"gitlab.com/NebulousLabs/errors"
+	"github.com/NebulousLabs/errors"
 )
 
 // ErrHostFault is an error that is usually extended to indicate that an error

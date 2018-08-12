@@ -3,7 +3,7 @@ package modules
 import (
 	"io"
 
-	"gitlab.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 const (

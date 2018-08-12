@@ -4,13 +4,13 @@ import (
 	"testing"
 	"time"
 
-	"gitlab.com/NebulousLabs/Sia/build"
-	"gitlab.com/NebulousLabs/Sia/crypto"
-	"gitlab.com/NebulousLabs/Sia/modules"
-	"gitlab.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/types"
 
-	"gitlab.com/NebulousLabs/errors"
-	"gitlab.com/NebulousLabs/fastrand"
+	"github.com/NebulousLabs/errors"
+	"github.com/NebulousLabs/fastrand"
 )
 
 // TestIntegrationAutoRenew tests that contracts are automatically renewed at
@@ -79,7 +79,7 @@ func TestIntegrationAutoRenew(t *testing.T) {
 
 	// check renewed contract
 	contract = c.Contracts()[0]
-	endHeight := c.contractEndHeight()
+	endHeight := c.CurrentPeriod() + c.allowance.Period
 	if contract.EndHeight != endHeight {
 		t.Fatalf("Wrong end height, expected %v got %v\n", endHeight, contract.EndHeight)
 	}
@@ -147,7 +147,7 @@ func TestIntegrationRenewInvalidate(t *testing.T) {
 
 	// check renewed contract
 	contract = c.Contracts()[0]
-	endHeight := c.contractEndHeight()
+	endHeight := c.CurrentPeriod() + c.allowance.Period
 	c.mu.Lock()
 	if contract.EndHeight != endHeight {
 		t.Fatalf("Wrong end height, expected %v got %v\n", endHeight, contract.EndHeight)

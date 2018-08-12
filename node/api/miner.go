@@ -3,8 +3,8 @@ package api
 import (
 	"net/http"
 
-	"gitlab.com/NebulousLabs/Sia/encoding"
-	"gitlab.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/Sia/encoding"
+	"github.com/NebulousLabs/Sia/types"
 
 	"github.com/julienschmidt/httprouter"
 )

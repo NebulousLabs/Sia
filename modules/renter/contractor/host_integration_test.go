@@ -9,19 +9,19 @@ import (
 	"testing"
 	"time"
 
-	"gitlab.com/NebulousLabs/Sia/build"
-	"gitlab.com/NebulousLabs/Sia/crypto"
-	"gitlab.com/NebulousLabs/Sia/encoding"
-	"gitlab.com/NebulousLabs/Sia/modules"
-	"gitlab.com/NebulousLabs/Sia/modules/consensus"
-	"gitlab.com/NebulousLabs/Sia/modules/gateway"
-	"gitlab.com/NebulousLabs/Sia/modules/host"
-	"gitlab.com/NebulousLabs/Sia/modules/miner"
-	"gitlab.com/NebulousLabs/Sia/modules/renter/hostdb"
-	"gitlab.com/NebulousLabs/Sia/modules/transactionpool"
-	modWallet "gitlab.com/NebulousLabs/Sia/modules/wallet"
-	"gitlab.com/NebulousLabs/Sia/types"
-	"gitlab.com/NebulousLabs/fastrand"
+	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/encoding"
+	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/modules/consensus"
+	"github.com/NebulousLabs/Sia/modules/gateway"
+	"github.com/NebulousLabs/Sia/modules/host"
+	"github.com/NebulousLabs/Sia/modules/miner"
+	"github.com/NebulousLabs/Sia/modules/renter/hostdb"
+	"github.com/NebulousLabs/Sia/modules/transactionpool"
+	modWallet "github.com/NebulousLabs/Sia/modules/wallet"
+	"github.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/fastrand"
 )
 
 // newTestingWallet is a helper function that creates a ready-to-use wallet
@@ -62,15 +62,11 @@ func newTestingWallet(testdir string, cs modules.ConsensusSet, tp modules.Transa
 
 // newTestingHost is a helper function that creates a ready-to-use host.
 func newTestingHost(testdir string, cs modules.ConsensusSet, tp modules.TransactionPool) (modules.Host, error) {
-	g, err := gateway.New("localhost:0", false, filepath.Join(testdir, modules.GatewayDir))
-	if err != nil {
-		return nil, err
-	}
 	w, err := newTestingWallet(testdir, cs, tp)
 	if err != nil {
 		return nil, err
 	}
-	h, err := host.New(cs, g, tp, w, "localhost:0", filepath.Join(testdir, modules.HostDir))
+	h, err := host.New(cs, tp, w, "localhost:0", filepath.Join(testdir, modules.HostDir))
 	if err != nil {
 		return nil, err
 	}
@@ -207,7 +203,7 @@ func TestIntegrationFormContract(t *testing.T) {
 	}
 
 	// form a contract with the host
-	_, _, err = c.managedNewContract(hostEntry, types.SiacoinPrecision.Mul64(50), c.blockHeight+100)
+	_, err = c.managedNewContract(hostEntry, types.SiacoinPrecision.Mul64(50), c.blockHeight+100)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -235,7 +231,7 @@ func TestIntegrationReviseContract(t *testing.T) {
 	}
 
 	// form a contract with the host
-	_, contract, err := c.managedNewContract(hostEntry, types.SiacoinPrecision.Mul64(50), c.blockHeight+100)
+	contract, err := c.managedNewContract(hostEntry, types.SiacoinPrecision.Mul64(50), c.blockHeight+100)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -278,7 +274,7 @@ func TestIntegrationUploadDownload(t *testing.T) {
 	}
 
 	// form a contract with the host
-	_, contract, err := c.managedNewContract(hostEntry, types.SiacoinPrecision.Mul64(50), c.blockHeight+100)
+	contract, err := c.managedNewContract(hostEntry, types.SiacoinPrecision.Mul64(50), c.blockHeight+100)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -338,7 +334,7 @@ func TestIntegrationRenew(t *testing.T) {
 	}
 
 	// form a contract with the host
-	_, contract, err := c.managedNewContract(hostEntry, types.SiacoinPrecision.Mul64(50), c.blockHeight+100)
+	contract, err := c.managedNewContract(hostEntry, types.SiacoinPrecision.Mul64(50), c.blockHeight+100)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -451,7 +447,7 @@ func TestIntegrationDownloaderCaching(t *testing.T) {
 	}
 
 	// form a contract with the host
-	_, contract, err := c.managedNewContract(hostEntry, types.SiacoinPrecision.Mul64(50), c.blockHeight+100)
+	contract, err := c.managedNewContract(hostEntry, types.SiacoinPrecision.Mul64(50), c.blockHeight+100)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -542,7 +538,7 @@ func TestIntegrationEditorCaching(t *testing.T) {
 	}
 
 	// form a contract with the host
-	_, contract, err := c.managedNewContract(hostEntry, types.SiacoinPrecision.Mul64(50), c.blockHeight+100)
+	contract, err := c.managedNewContract(hostEntry, types.SiacoinPrecision.Mul64(50), c.blockHeight+100)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -612,7 +608,7 @@ func TestIntegrationEditorCaching(t *testing.T) {
 
 // TestContractPresenceLeak tests that a renter can not tell from the response
 // of the host to RPCs if the host has the contract if the renter doesn't
-// own this contract. See https://gitlab.com/NebulousLabs/Sia/issues/2327.
+// own this contract. See https://github.com/NebulousLabs/Sia/issues/2327.
 func TestContractPresenceLeak(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
@@ -633,7 +629,7 @@ func TestContractPresenceLeak(t *testing.T) {
 	}
 
 	// form a contract with the host
-	_, contract, err := c.managedNewContract(hostEntry, types.SiacoinPrecision.Mul64(10), c.blockHeight+100)
+	contract, err := c.managedNewContract(hostEntry, types.SiacoinPrecision.Mul64(10), c.blockHeight+100)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -1,15 +1,15 @@
 package siatest
 
 import (
-	"encoding/hex"
-	"fmt"
 	"io/ioutil"
+	"math"
 	"os"
 	"path/filepath"
+	"strconv"
 
-	"gitlab.com/NebulousLabs/Sia/crypto"
-	"gitlab.com/NebulousLabs/errors"
-	"gitlab.com/NebulousLabs/fastrand"
+	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/errors"
+	"github.com/NebulousLabs/fastrand"
 )
 
 type (
@@ -17,21 +17,19 @@ type (
 	// network.
 	LocalFile struct {
 		path     string
-		size     int
 		checksum crypto.Hash
 	}
 )
 
 // NewFile creates and returns a new LocalFile. It will write size random bytes
 // to the file and give the file a random name.
-func (tn *TestNode) NewFile(size int) (*LocalFile, error) {
-	fileName := fmt.Sprintf("%dbytes-%s", size, hex.EncodeToString(fastrand.Bytes(4)))
-	path := filepath.Join(tn.filesDir(), fileName)
+func NewFile(size int) (*LocalFile, error) {
+	fileName := strconv.Itoa(fastrand.Intn(math.MaxInt32))
+	path := filepath.Join(SiaTestingDir, fileName)
 	bytes := fastrand.Bytes(size)
 	err := ioutil.WriteFile(path, bytes, 0600)
 	return &LocalFile{
 		path:     path,
-		size:     size,
 		checksum: crypto.HashBytes(bytes),
 	}, err
 }
@@ -45,9 +43,6 @@ func (lf *LocalFile) Delete() error {
 // on disk
 func (lf *LocalFile) checkIntegrity() error {
 	data, err := ioutil.ReadFile(lf.path)
-	if lf.size == 0 {
-		data = fastrand.Bytes(lf.size)
-	}
 	if err != nil {
 		return errors.AddContext(err, "failed to read file from disk")
 	}

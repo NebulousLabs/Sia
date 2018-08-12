@@ -4,9 +4,9 @@ import (
 	"reflect"
 	"testing"
 
-	"gitlab.com/NebulousLabs/Sia/node"
-	"gitlab.com/NebulousLabs/Sia/siatest"
-	"gitlab.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/Sia/node"
+	"github.com/NebulousLabs/Sia/siatest"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // TestApiHeight checks if the consensus api endpoint works
@@ -14,10 +14,13 @@ func TestApiHeight(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	testDir := consensusTestDir(t.Name())
+	testdir, err := siatest.TestDir(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Create a new server
-	testNode, err := siatest.NewNode(node.AllModules(testDir))
+	testNode, err := siatest.NewNode(node.AllModules(testdir))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -60,7 +63,7 @@ func TestConsensusBlocksIDGet(t *testing.T) {
 		Renters: 1,
 		Miners:  1,
 	}
-	tg, err := siatest.NewGroupFromTemplate(consensusTestDir(t.Name()), groupParams)
+	tg, err := siatest.NewGroupFromTemplate(groupParams)
 	if err != nil {
 		t.Fatal("Failed to create group: ", err)
 	}

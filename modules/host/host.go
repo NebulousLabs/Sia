@@ -70,13 +70,13 @@ import (
 	"path/filepath"
 	"sync"
 
-	"gitlab.com/NebulousLabs/Sia/build"
-	"gitlab.com/NebulousLabs/Sia/crypto"
-	"gitlab.com/NebulousLabs/Sia/modules"
-	"gitlab.com/NebulousLabs/Sia/modules/host/contractmanager"
-	"gitlab.com/NebulousLabs/Sia/persist"
-	siasync "gitlab.com/NebulousLabs/Sia/sync"
-	"gitlab.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/modules/host/contractmanager"
+	"github.com/NebulousLabs/Sia/persist"
+	siasync "github.com/NebulousLabs/Sia/sync"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 const (
@@ -99,10 +99,9 @@ var (
 	errHostClosed = errors.New("call is disabled because the host is closed")
 
 	// Nil dependency errors.
-	errNilCS      = errors.New("host cannot use a nil state")
-	errNilTpool   = errors.New("host cannot use a nil transaction pool")
-	errNilWallet  = errors.New("host cannot use a nil wallet")
-	errNilGateway = errors.New("host cannot use nil gateway")
+	errNilCS     = errors.New("host cannot use a nil state")
+	errNilTpool  = errors.New("host cannot use a nil transaction pool")
+	errNilWallet = errors.New("host cannot use a nil wallet")
 
 	// persistMetadata is the header that gets written to the persist file, and is
 	// used to recognize other persist files.
@@ -137,7 +136,6 @@ type Host struct {
 
 	// Dependencies.
 	cs           modules.ConsensusSet
-	g            modules.Gateway
 	tpool        modules.TransactionPool
 	wallet       modules.Wallet
 	dependencies modules.Dependencies
@@ -216,13 +214,10 @@ func (h *Host) checkUnlockHash() error {
 // mocked such that the dependencies can return unexpected errors or unique
 // behaviors during testing, enabling easier testing of the failure modes of
 // the Host.
-func newHost(dependencies modules.Dependencies, cs modules.ConsensusSet, g modules.Gateway, tpool modules.TransactionPool, wallet modules.Wallet, listenerAddress string, persistDir string) (*Host, error) {
+func newHost(dependencies modules.Dependencies, cs modules.ConsensusSet, tpool modules.TransactionPool, wallet modules.Wallet, listenerAddress string, persistDir string) (*Host, error) {
 	// Check that all the dependencies were provided.
 	if cs == nil {
 		return nil, errNilCS
-	}
-	if g == nil {
-		return nil, errNilGateway
 	}
 	if tpool == nil {
 		return nil, errNilTpool
@@ -234,7 +229,6 @@ func newHost(dependencies modules.Dependencies, cs modules.ConsensusSet, g modul
 	// Create the host object.
 	h := &Host{
 		cs:           cs,
-		g:            g,
 		tpool:        tpool,
 		wallet:       wallet,
 		dependencies: dependencies,
@@ -313,8 +307,8 @@ func newHost(dependencies modules.Dependencies, cs modules.ConsensusSet, g modul
 }
 
 // New returns an initialized Host.
-func New(cs modules.ConsensusSet, g modules.Gateway, tpool modules.TransactionPool, wallet modules.Wallet, address string, persistDir string) (*Host, error) {
-	return newHost(modules.ProdDependencies, cs, g, tpool, wallet, address, persistDir)
+func New(cs modules.ConsensusSet, tpool modules.TransactionPool, wallet modules.Wallet, address string, persistDir string) (*Host, error) {
+	return newHost(modules.ProdDependencies, cs, tpool, wallet, address, persistDir)
 }
 
 // Close shuts down the host.

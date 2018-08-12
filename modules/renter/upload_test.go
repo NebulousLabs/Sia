@@ -5,7 +5,7 @@ import (
 	"os"
 	"testing"
 
-	"gitlab.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/modules"
 )
 
 // TestRenterUploadDirectory verifies that the renter returns an error if a

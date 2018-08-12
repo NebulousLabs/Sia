@@ -8,11 +8,11 @@ import (
 	"path/filepath"
 	"sync"
 
-	"gitlab.com/NebulousLabs/Sia/build"
-	"gitlab.com/NebulousLabs/Sia/crypto"
-	"gitlab.com/NebulousLabs/Sia/modules"
-	"gitlab.com/NebulousLabs/Sia/persist"
-	"gitlab.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/persist"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 var (
@@ -323,27 +323,15 @@ func (r *Renter) FileList() []modules.FileInfo {
 		if exists {
 			localPath = tf.RepairPath
 		}
-		// Check for 0byte files
-		//
-		// TODO - once tiny files are stored in the metadata this code should be
-		// able to be cleaned up.
-		var redundancy, uploadProgress float64
-		if f.size == 0 {
-			redundancy = float64(f.erasureCode.NumPieces()) / float64(f.erasureCode.MinPieces())
-			uploadProgress = 100
-		} else {
-			redundancy = f.redundancy(offline, goodForRenew)
-			uploadProgress = f.uploadProgress()
-		}
 		fileList = append(fileList, modules.FileInfo{
 			SiaPath:        f.name,
 			LocalPath:      localPath,
 			Filesize:       f.size,
 			Renewing:       renewing,
 			Available:      f.available(offline),
-			Redundancy:     redundancy,
+			Redundancy:     f.redundancy(offline, goodForRenew),
 			UploadedBytes:  f.uploadedBytes(),
-			UploadProgress: uploadProgress,
+			UploadProgress: f.uploadProgress(),
 			Expiration:     f.expiration(),
 		})
 		f.mu.RUnlock()

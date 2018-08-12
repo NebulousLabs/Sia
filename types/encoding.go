@@ -10,9 +10,9 @@ import (
 	"strings"
 	"unsafe"
 
-	"gitlab.com/NebulousLabs/Sia/build"
-	"gitlab.com/NebulousLabs/Sia/crypto"
-	"gitlab.com/NebulousLabs/Sia/encoding"
+	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/encoding"
 )
 
 // sanityCheckWriter checks that the bytes written to w exactly match the
@@ -457,11 +457,6 @@ func (fcr *FileContractRevision) UnmarshalSia(r io.Reader) error {
 	}
 	d.ReadFull(fcr.NewUnlockHash[:])
 	return d.Err()
-}
-
-// LoadString loads a FileContractID from a string
-func (fcid *FileContractID) LoadString(str string) error {
-	return (*crypto.Hash)(fcid).LoadString(str)
 }
 
 // MarshalJSON marshals an id as a hex string.

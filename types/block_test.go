@@ -3,8 +3,8 @@ package types
 import (
 	"testing"
 
-	"gitlab.com/NebulousLabs/Sia/crypto"
-	"gitlab.com/NebulousLabs/Sia/encoding"
+	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/encoding"
 )
 
 // TestCalculateCoinbase probes the CalculateCoinbase function. The test code

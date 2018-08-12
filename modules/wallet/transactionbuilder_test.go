@@ -4,8 +4,8 @@ import (
 	"sync"
 	"testing"
 
-	"gitlab.com/NebulousLabs/Sia/modules"
-	"gitlab.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // addBlockNoPayout adds a block to the wallet tester that does not have any

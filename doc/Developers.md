@@ -12,11 +12,11 @@ on that [here](http://golang.org/doc/install/source).
 Sia has a development build, an automated testing build, and a release
 build. The release build is the only one that can synchronize to the full
 network. To get the release build, it is usually sufficient to run `go get -u
-gitlab.com/NebulousLabs/Sia/...`. This will download Sia and its dependencies
+github.com/NebulousLabs/Sia/...`. This will download Sia and its dependencies
 and install binaries in `$GOPATH/bin`.
 
 After downloading, you can find the Sia source code in
-`$GOPATH/src/gitlab.com/NebulousLabs/Sia`. To build the release binary, run
+`$GOPATH/src/github.com/NebulousLabs/Sia`. To build the release binary, run
 `make release-std` from this directory. To build the release binary with a
 (slow) race detector and an array of debugging asserts, run `make release`. To
 build the developer binary (which has a different genesis block, faster block
@@ -34,9 +34,9 @@ does not recognize (usually the wrong path, or symbolic links were somehow
 involved).
 
 ```
-consensus/fork.go:4:2: cannot find package "gitlab.com/NebulousLabs/Sia/crypto" in any of:
-    /usr/lib/go/src/gitlab.com/NebulousLabs/Sia/crypto (from $GOROOT)
-    /home/user/gopath/src/gitlab.com/NebulousLabs/Sia/crypto (from $GOPATH)
+consensus/fork.go:4:2: cannot find package "github.com/NebulousLabs/Sia/crypto" in any of:
+    /usr/lib/go/src/github.com/NebulousLabs/Sia/crypto (from $GOROOT)
+    /home/user/gopath/src/github.com/NebulousLabs/Sia/crypto (from $GOPATH)
 ```
 
 Developer Conventions

@@ -9,9 +9,9 @@ import (
 	"sync"
 	"time"
 
-	"gitlab.com/NebulousLabs/Sia/build"
-	"gitlab.com/NebulousLabs/Sia/persist"
-	"gitlab.com/NebulousLabs/fastrand"
+	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/persist"
+	"github.com/NebulousLabs/fastrand"
 )
 
 // ProdDependencies act as a global instance of the production dependencies to
