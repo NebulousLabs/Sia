@@ -3,7 +3,7 @@ package miner
 import (
 	"testing"
 
-	"gitlab.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/modules"
 )
 
 // TestIntegrationBlockHeightReorg checks that the miner has the correct block

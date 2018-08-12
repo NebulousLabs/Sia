@@ -1,8 +1,8 @@
 package contractor
 
 import (
-	"gitlab.com/NebulousLabs/Sia/modules"
-	"gitlab.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/types"
 )
 
 // managedArchiveContracts will figure out which contracts are no longer needed
@@ -56,8 +56,12 @@ func (c *Contractor) ProcessConsensusChange(cc modules.ConsensusChange) {
 	}
 
 	// If we have entered the next period, update currentPeriod
-	if c.blockHeight >= c.currentPeriod+c.allowance.Period {
-		c.currentPeriod += c.allowance.Period
+	// NOTE: "period" refers to the duration of contracts, whereas "cycle"
+	// refers to how frequently the period metrics are reset.
+	// TODO: How to make this more explicit.
+	cycleLen := c.allowance.Period - c.allowance.RenewWindow
+	if c.blockHeight >= c.currentPeriod+cycleLen {
+		c.currentPeriod += cycleLen
 		// COMPATv1.0.4-lts
 		// if we were storing a special metrics contract, it will be invalid
 		// after we enter the next period.

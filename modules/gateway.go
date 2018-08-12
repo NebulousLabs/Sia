@@ -3,7 +3,7 @@ package modules
 import (
 	"net"
 
-	"gitlab.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/build"
 )
 
 const (
@@ -164,12 +164,6 @@ type (
 
 		// Disconnect terminates a connection to a peer.
 		Disconnect(NetAddress) error
-
-		// DiscoverAddress discovers and returns the current public IP address
-		// of the gateway. Contrary to Address, DiscoverAddress is blocking and
-		// might take multiple minutes to return. A channel to cancel the
-		// discovery can be supplied optionally.
-		DiscoverAddress(cancel <-chan struct{}) (NetAddress, error)
 
 		// Address returns the Gateway's address.
 		Address() NetAddress

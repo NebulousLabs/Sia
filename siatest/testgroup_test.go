@@ -1,11 +1,10 @@
 package siatest
 
 import (
-	"path/filepath"
 	"testing"
 
-	"gitlab.com/NebulousLabs/Sia/build"
-	"gitlab.com/NebulousLabs/Sia/node"
+	"github.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/node"
 )
 
 // TestCreateTestGroup tests the behavior of NewGroup.
@@ -20,7 +19,7 @@ func TestNewGroup(t *testing.T) {
 		Miners:  2,
 	}
 	// Create the group
-	tg, err := NewGroupFromTemplate(siatestTestDir(t.Name()), groupParams)
+	tg, err := NewGroupFromTemplate(groupParams)
 	if err != nil {
 		t.Fatal("Failed to create group: ", err)
 	}
@@ -72,7 +71,7 @@ func TestNewGroupNoMiner(t *testing.T) {
 		Miners:  0,
 	}
 	// Create the group
-	_, err := NewGroupFromTemplate(siatestTestDir(t.Name()), groupParams)
+	_, err := NewGroupFromTemplate(groupParams)
 	if err == nil {
 		t.Fatal("Creating a group without miners should fail: ", err)
 	}
@@ -90,7 +89,7 @@ func TestNewGroupNoRenterHost(t *testing.T) {
 		Miners:  5,
 	}
 	// Create the group
-	tg, err := NewGroupFromTemplate(siatestTestDir(t.Name()), groupParams)
+	tg, err := NewGroupFromTemplate(groupParams)
 	if err != nil {
 		t.Fatal("Failed to create group: ", err)
 	}
@@ -112,7 +111,7 @@ func TestAddNewNode(t *testing.T) {
 		Renters: 2,
 		Miners:  1,
 	}
-	tg, err := NewGroupFromTemplate(siatestTestDir(t.Name()), groupParams)
+	tg, err := NewGroupFromTemplate(groupParams)
 	if err != nil {
 		t.Fatal("Failed to create group: ", err)
 	}
@@ -126,8 +125,11 @@ func TestAddNewNode(t *testing.T) {
 	oldRenters := tg.Renters()
 
 	// Test adding a node
-	testDir := TestDir(t.Name())
-	renterTemplate := node.Renter(filepath.Join(testDir, "/renter"))
+	testDir, err := TestDir(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	renterTemplate := node.Renter(testDir + "/renter")
 	nodes, err := tg.AddNodes(renterTemplate)
 	if err != nil {
 		t.Fatal(err)

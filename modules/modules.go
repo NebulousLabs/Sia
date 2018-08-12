@@ -6,7 +6,7 @@ package modules
 import (
 	"time"
 
-	"gitlab.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/build"
 )
 
 var (

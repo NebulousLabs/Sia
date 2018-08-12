@@ -4,7 +4,7 @@ import (
 	"math/big"
 	"testing"
 
-	"gitlab.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/crypto"
 )
 
 // TestTargetAdd probes the Add function of the target type.

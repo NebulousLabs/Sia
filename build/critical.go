@@ -11,7 +11,7 @@ import (
 // issue tracker on Github. If the program does not panic, the call stack for
 // the running goroutine is printed to help determine the error.
 func Critical(v ...interface{}) {
-	s := "Critical error: " + fmt.Sprintln(v...) + "Please submit a bug report here: https://gitlab.com/NebulousLabs/Sia/issues\n"
+	s := "Critical error: " + fmt.Sprintln(v...) + "Please submit a bug report here: https://github.com/NebulousLabs/Sia/issues\n"
 	if Release != "testing" {
 		debug.PrintStack()
 		os.Stderr.WriteString(s)

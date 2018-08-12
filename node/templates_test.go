@@ -3,7 +3,7 @@ package node
 import (
 	"testing"
 
-	"gitlab.com/NebulousLabs/Sia/build"
+	"github.com/NebulousLabs/Sia/build"
 )
 
 // TestNew is a basic smoke test for New that uses all of the templates to

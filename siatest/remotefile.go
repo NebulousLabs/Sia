@@ -1,7 +1,7 @@
 package siatest
 
 import (
-	"gitlab.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/crypto"
 )
 
 type (

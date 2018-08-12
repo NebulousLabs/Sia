@@ -13,7 +13,7 @@ import (
 	"errors"
 	"hash"
 
-	"gitlab.com/NebulousLabs/Sia/encoding"
+	"github.com/NebulousLabs/Sia/encoding"
 
 	"golang.org/x/crypto/blake2b"
 )
