@@ -13,6 +13,7 @@ import (
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/modules/renter/siafile"
 	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -174,26 +175,26 @@ func (f *file) UnmarshalSia(r io.Reader) error {
 }
 
 // saveFile saves a file to the renter directory.
-func (r *Renter) saveFile(f *file) error {
-	if f.deleted {
+func (r *Renter) saveFile(f *siafile.SiaFile) error {
+	if f.Deleted() { // TODO: violation of locking convention
 		return errors.New("can't save deleted file")
 	}
 	// Create directory structure specified in nickname.
-	fullPath := filepath.Join(r.persistDir, f.name+ShareExtension)
+	fullPath := filepath.Join(r.persistDir, f.SiaPath()+ShareExtension)
 	err := os.MkdirAll(filepath.Dir(fullPath), 0700)
 	if err != nil {
 		return err
 	}
 
 	// Open SafeFile handle.
-	handle, err := persist.NewSafeFile(filepath.Join(r.persistDir, f.name+ShareExtension))
+	handle, err := persist.NewSafeFile(filepath.Join(r.persistDir, f.SiaPath()+ShareExtension))
 	if err != nil {
 		return err
 	}
 	defer handle.Close()
 
 	// Write file data.
-	err = shareFiles([]*file{f}, handle)
+	err = r.shareFiles([]*siafile.SiaFile{f}, handle)
 	if err != nil {
 		return err
 	}
@@ -278,7 +279,12 @@ func (r *Renter) loadSettings() error {
 
 // shareFiles writes the specified files to w. First a header is written,
 // followed by the gzipped concatenation of each file.
-func shareFiles(files []*file, w io.Writer) error {
+func (r *Renter) shareFiles(siaFiles []*siafile.SiaFile, w io.Writer) error {
+	// Convert files to old type.
+	files := make([]*file, 0, len(siaFiles))
+	for _, sf := range siaFiles {
+		files = append(files, r.siaFileToFile(sf))
+	}
 	// Write header.
 	err := encoding.NewEncoder(w).EncodeAll(
 		shareHeader,
@@ -321,7 +327,7 @@ func (r *Renter) ShareFiles(nicknames []string, shareDest string) error {
 	defer handle.Close()
 
 	// Load files from renter.
-	files := make([]*file, len(nicknames))
+	files := make([]*siafile.SiaFile, len(nicknames))
 	for i, name := range nicknames {
 		f, exists := r.files[name]
 		if !exists {
@@ -330,7 +336,7 @@ func (r *Renter) ShareFiles(nicknames []string, shareDest string) error {
 		files[i] = f
 	}
 
-	err = shareFiles(files, handle)
+	err = r.shareFiles(files, handle)
 	if err != nil {
 		os.Remove(shareDest)
 		return err
@@ -345,7 +351,7 @@ func (r *Renter) ShareFilesASCII(nicknames []string) (string, error) {
 	defer r.mu.RUnlock(lockID)
 
 	// Load files from renter.
-	files := make([]*file, len(nicknames))
+	files := make([]*siafile.SiaFile, len(nicknames))
 	for i, name := range nicknames {
 		f, exists := r.files[name]
 		if !exists {
@@ -355,7 +361,7 @@ func (r *Renter) ShareFilesASCII(nicknames []string) (string, error) {
 	}
 
 	buf := new(bytes.Buffer)
-	err := shareFiles(files, base64.NewEncoder(base64.URLEncoding, buf))
+	err := r.shareFiles(files, base64.NewEncoder(base64.URLEncoding, buf))
 	if err != nil {
 		return "", err
 	}
@@ -415,12 +421,12 @@ func (r *Renter) loadSharedFiles(reader io.Reader) ([]string, error) {
 	// Add files to renter.
 	names := make([]string, numFiles)
 	for i, f := range files {
-		r.files[f.name] = f
+		r.files[f.name] = r.fileToSiaFile(f, r.persist.Tracking[f.name].RepairPath)
 		names[i] = f.name
 	}
 	// Save the files.
 	for _, f := range files {
-		r.saveFile(f)
+		r.saveFile(r.fileToSiaFile(f, r.persist.Tracking[f.name].RepairPath))
 	}
 
 	return names, nil

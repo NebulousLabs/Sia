@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/modules/renter/siafile"
 
 	"github.com/NebulousLabs/errors"
 )
@@ -23,7 +24,7 @@ type unfinishedUploadChunk struct {
 	// is known not to exist locally.
 	id         uploadChunkID
 	localPath  string
-	renterFile *file
+	renterFile *siafile.SiaFile
 
 	// Information about the chunk, namely where it exists within the file.
 	//
@@ -129,8 +130,8 @@ func (r *Renter) managedDownloadLogicalChunkData(chunk *unfinishedUploadChunk) e
 	// TODO: There is a disparity in the way that the upload and download code
 	// handle the last chunk, which may not be full sized.
 	downloadLength := chunk.length
-	if chunk.index == chunk.renterFile.numChunks()-1 && chunk.renterFile.size%chunk.length != 0 {
-		downloadLength = chunk.renterFile.size % chunk.length
+	if chunk.index == chunk.renterFile.NumChunks()-1 && chunk.renterFile.Size()%chunk.length != 0 {
+		downloadLength = chunk.renterFile.Size() % chunk.length
 	}
 
 	// Create the download.
@@ -176,7 +177,7 @@ func (r *Renter) managedDownloadLogicalChunkData(chunk *unfinishedUploadChunk) e
 func (r *Renter) managedFetchAndRepairChunk(chunk *unfinishedUploadChunk) {
 	// Calculate the amount of memory needed for erasure coding. This will need
 	// to be released if there's an error before erasure coding is complete.
-	erasureCodingMemory := chunk.renterFile.pieceSize * uint64(chunk.renterFile.erasureCode.MinPieces())
+	erasureCodingMemory := chunk.renterFile.PieceSize() * uint64(chunk.renterFile.ErasureCode(chunk.index).MinPieces())
 
 	// Calculate the amount of memory to release due to already completed
 	// pieces. This memory gets released during encryption, but needs to be
@@ -184,7 +185,7 @@ func (r *Renter) managedFetchAndRepairChunk(chunk *unfinishedUploadChunk) {
 	var pieceCompletedMemory uint64
 	for i := 0; i < len(chunk.pieceUsage); i++ {
 		if chunk.pieceUsage[i] {
-			pieceCompletedMemory += chunk.renterFile.pieceSize + crypto.TwofishOverhead
+			pieceCompletedMemory += chunk.renterFile.PieceSize() + crypto.TwofishOverhead
 		}
 	}
 
@@ -221,7 +222,7 @@ func (r *Renter) managedFetchAndRepairChunk(chunk *unfinishedUploadChunk) {
 	// fact to reduce the total memory required to create the physical data.
 	// That will also change the amount of memory we need to allocate, and the
 	// number of times we need to return memory.
-	chunk.physicalChunkData, err = chunk.renterFile.erasureCode.EncodeShards(chunk.logicalChunkData)
+	chunk.physicalChunkData, err = chunk.renterFile.ErasureCode(chunk.index).EncodeShards(chunk.logicalChunkData)
 	chunk.logicalChunkData = nil
 	r.memoryManager.Return(erasureCodingMemory)
 	chunk.memoryReleased += erasureCodingMemory
@@ -251,7 +252,7 @@ func (r *Renter) managedFetchAndRepairChunk(chunk *unfinishedUploadChunk) {
 			chunk.physicalChunkData[i] = nil
 		} else {
 			// Encrypt the piece.
-			key := deriveKey(chunk.renterFile.masterKey, chunk.index, uint64(i))
+			key := deriveKey(chunk.renterFile.MasterKey(), chunk.index, uint64(i))
 			chunk.physicalChunkData[i] = key.EncryptBytes(chunk.physicalChunkData[i])
 		}
 	}
@@ -320,6 +321,7 @@ func (r *Renter) managedFetchLogicalChunkData(chunk *unfinishedUploadChunk) erro
 // cleanup required. This can include returning rememory and releasing the chunk
 // from the map of active chunks in the chunk heap.
 func (r *Renter) managedCleanUpUploadChunk(uc *unfinishedUploadChunk) {
+	pieceSize := uc.renterFile.PieceSize()
 	uc.mu.Lock()
 	piecesAvailable := 0
 	var memoryReleased uint64
@@ -336,7 +338,7 @@ func (r *Renter) managedCleanUpUploadChunk(uc *unfinishedUploadChunk) {
 		// will prefer releasing later pieces, which improves computational
 		// complexity for erasure coding.
 		if piecesAvailable >= uc.workersRemaining {
-			memoryReleased += uc.renterFile.pieceSize + crypto.TwofishOverhead
+			memoryReleased += pieceSize + crypto.TwofishOverhead
 			uc.physicalChunkData[i] = nil
 			// Mark this piece as taken so that we don't double release memory.
 			uc.pieceUsage[i] = true

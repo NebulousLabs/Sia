@@ -132,6 +132,7 @@ import (
 	"time"
 
 	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/modules/renter/siafile"
 	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/types"
 
@@ -178,7 +179,7 @@ type (
 		destination       downloadDestination // The place to write the downloaded data.
 		destinationType   string              // "file", "buffer", "http stream", etc.
 		destinationString string              // The string to report to the user for the destination.
-		file              *file               // The file to download.
+		file              *siafile.SiaFile    // The file to download.
 
 		latencyTarget time.Duration // Workers above this latency will be automatically put on standby initially.
 		length        uint64        // Length of download. Cannot be 0.
@@ -285,16 +286,16 @@ func (r *Renter) managedDownload(p modules.RenterDownloadParameters) (*download,
 	if p.Destination != "" && !filepath.IsAbs(p.Destination) {
 		return nil, errors.New("destination must be an absolute path")
 	}
-	if p.Offset == file.size {
+	if p.Offset == file.Size() {
 		return nil, errors.New("offset equals filesize")
 	}
 	// Sentinel: if length == 0, download the entire file.
 	if p.Length == 0 {
-		p.Length = file.size - p.Offset
+		p.Length = file.Size() - p.Offset
 	}
 	// Check whether offset and length is valid.
-	if p.Offset < 0 || p.Offset+p.Length > file.size {
-		return nil, fmt.Errorf("offset and length combination invalid, max byte is at index %d", file.size-1)
+	if p.Offset < 0 || p.Offset+p.Length > file.Size() {
+		return nil, fmt.Errorf("offset and length combination invalid, max byte is at index %d", file.Size()-1)
 	}
 
 	// Instantiate the correct downloadWriter implementation.
@@ -304,7 +305,7 @@ func (r *Renter) managedDownload(p modules.RenterDownloadParameters) (*download,
 		dw = newDownloadDestinationWriteCloserFromWriter(p.Httpwriter)
 		destinationType = "http stream"
 	} else {
-		osFile, err := os.OpenFile(p.Destination, os.O_CREATE|os.O_WRONLY, os.FileMode(file.mode))
+		osFile, err := os.OpenFile(p.Destination, os.O_CREATE|os.O_WRONLY, file.Mode())
 		if err != nil {
 			return nil, err
 		}
@@ -352,7 +353,7 @@ func (r *Renter) managedNewDownload(params downloadParams) (*download, error) {
 	if params.offset < 0 {
 		return nil, errors.New("download offset cannot be a negative number")
 	}
-	if params.offset+params.length > params.file.size {
+	if params.offset+params.length > params.file.Size() {
 		return nil, errors.New("download is requesting data past the boundary of the file")
 	}
 
@@ -369,7 +370,7 @@ func (r *Renter) managedNewDownload(params downloadParams) (*download, error) {
 		staticLength:          params.length,
 		staticOffset:          params.offset,
 		staticOverdrive:       params.overdrive,
-		staticSiaPath:         params.file.name,
+		staticSiaPath:         params.file.SiaPath(),
 		staticPriority:        params.priority,
 
 		log:           r.log,
@@ -377,34 +378,45 @@ func (r *Renter) managedNewDownload(params downloadParams) (*download, error) {
 	}
 
 	// Determine which chunks to download.
-	minChunk := params.offset / params.file.staticChunkSize()
-	maxChunk := (params.offset + params.length - 1) / params.file.staticChunkSize()
+	minChunk, minChunkOffset := params.file.ChunkIndexByOffset(params.offset)
+	maxChunk, maxChunkOffset := params.file.ChunkIndexByOffset(params.offset + params.length)
+	if minChunk == params.file.NumChunks() || maxChunk == params.file.NumChunks() {
+		return nil, errors.New("download is requesting a chunk that is past the boundary of the file")
+	}
+	// If the maxChunkOffset is exactly 0 we need to subtract 1 chunk. e.g. if
+	// the chunkSize is 100 bytes and we want to download 100 bytes from offset
+	// 0, maxChunk would be 1 and maxChunkOffset would be 0. We want maxChunk
+	// to be 0 though since we don't actually need any data from chunk 1.
+	if maxChunk > 0 && maxChunkOffset == 0 {
+		maxChunk--
+	}
 
 	// For each chunk, assemble a mapping from the contract id to the index of
 	// the piece within the chunk that the contract is responsible for.
 	chunkMaps := make([]map[string]downloadPieceInfo, maxChunk-minChunk+1)
-	for i := range chunkMaps {
-		chunkMaps[i] = make(map[string]downloadPieceInfo)
-	}
-	params.file.mu.Lock()
-	for id, contract := range params.file.contracts {
-		resolvedKey := r.hostContractor.ResolveIDToPubKey(id)
-		for _, piece := range contract.Pieces {
-			if piece.Chunk >= minChunk && piece.Chunk <= maxChunk {
+	for chunkIndex := minChunk; chunkIndex <= maxChunk; chunkIndex++ {
+		// Create the map.
+		chunkMaps[chunkIndex-minChunk] = make(map[string]downloadPieceInfo)
+		// Get the pieces for the chunk.
+		pieces, err := params.file.Pieces(uint64(chunkIndex))
+		if err != nil {
+			return nil, err
+		}
+		for pieceIndex, pieceSet := range pieces {
+			for _, piece := range pieceSet {
 				// Sanity check - the same worker should not have two pieces for
 				// the same chunk.
-				_, exists := chunkMaps[piece.Chunk-minChunk][string(resolvedKey.Key)]
+				_, exists := chunkMaps[chunkIndex-minChunk][string(piece.HostPubKey.Key)]
 				if exists {
 					r.log.Println("ERROR: Worker has multiple pieces uploaded for the same chunk.")
 				}
-				chunkMaps[piece.Chunk-minChunk][string(resolvedKey.Key)] = downloadPieceInfo{
-					index: piece.Piece,
+				chunkMaps[chunkIndex-minChunk][string(piece.HostPubKey.Key)] = downloadPieceInfo{
+					index: uint64(pieceIndex),
 					root:  piece.MerkleRoot,
 				}
 			}
 		}
 	}
-	params.file.mu.Unlock()
 
 	// Queue the downloads for each chunk.
 	writeOffset := int64(0) // where to write a chunk within the download destination.
@@ -412,14 +424,14 @@ func (r *Renter) managedNewDownload(params downloadParams) (*download, error) {
 	for i := minChunk; i <= maxChunk; i++ {
 		udc := &unfinishedDownloadChunk{
 			destination: params.destination,
-			erasureCode: params.file.erasureCode,
-			masterKey:   params.file.masterKey,
+			erasureCode: params.file.ErasureCode(i),
+			masterKey:   params.file.MasterKey(),
 
 			staticChunkIndex: i,
 			staticCacheID:    fmt.Sprintf("%v:%v", d.staticSiaPath, i),
 			staticChunkMap:   chunkMaps[i-minChunk],
-			staticChunkSize:  params.file.staticChunkSize(),
-			staticPieceSize:  params.file.pieceSize,
+			staticChunkSize:  params.file.ChunkSize(i),
+			staticPieceSize:  params.file.PieceSize(),
 
 			// TODO: 25ms is just a guess for a good default. Really, we want to
 			// set the latency target such that slower workers will pick up the
@@ -434,8 +446,8 @@ func (r *Renter) managedNewDownload(params downloadParams) (*download, error) {
 			staticNeedsMemory:   params.needsMemory,
 			staticPriority:      params.priority,
 
-			physicalChunkData: make([][]byte, params.file.erasureCode.NumPieces()),
-			pieceUsage:        make([]bool, params.file.erasureCode.NumPieces()),
+			physicalChunkData: make([][]byte, params.file.ErasureCode(i).NumPieces()),
+			pieceUsage:        make([]bool, params.file.ErasureCode(i).NumPieces()),
 
 			download:          d,
 			staticStreamCache: r.staticStreamCache,
@@ -444,16 +456,16 @@ func (r *Renter) managedNewDownload(params downloadParams) (*download, error) {
 		// Set the fetchOffset - the offset within the chunk that we start
 		// downloading from.
 		if i == minChunk {
-			udc.staticFetchOffset = params.offset % params.file.staticChunkSize()
+			udc.staticFetchOffset = minChunkOffset
 		} else {
 			udc.staticFetchOffset = 0
 		}
 		// Set the fetchLength - the number of bytes to fetch within the chunk
 		// that we start downloading from.
-		if i == maxChunk && (params.length+params.offset)%params.file.staticChunkSize() != 0 {
-			udc.staticFetchLength = ((params.length + params.offset) % params.file.staticChunkSize()) - udc.staticFetchOffset
+		if i == maxChunk && maxChunkOffset != 0 {
+			udc.staticFetchLength = maxChunkOffset - udc.staticFetchOffset
 		} else {
-			udc.staticFetchLength = params.file.staticChunkSize() - udc.staticFetchOffset
+			udc.staticFetchLength = params.file.ChunkSize(i) - udc.staticFetchOffset
 		}
 		// Set the writeOffset within the destination for where the data should
 		// be written.

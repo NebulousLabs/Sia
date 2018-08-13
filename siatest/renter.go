@@ -270,7 +270,7 @@ func (tn *TestNode) WaitForUploadRedundancy(rf *RemoteFile, redundancy float64) 
 		return errors.New("file is not tracked by renter")
 	}
 	// Wait until it reaches the redundancy
-	return Retry(600, 100*time.Millisecond, func() error {
+	err := Retry(600, 100*time.Millisecond, func() error {
 		file, err := tn.FileInfo(rf)
 		if err != nil {
 			return errors.AddContext(err, "couldn't retrieve FileInfo")
@@ -280,6 +280,20 @@ func (tn *TestNode) WaitForUploadRedundancy(rf *RemoteFile, redundancy float64) 
 		}
 		return nil
 	})
+	if err != nil {
+		rc, err2 := tn.RenterContractsGet()
+		if err2 != nil {
+			return errors.Compose(err, err2)
+		}
+		goodHosts := 0
+		for _, contract := range rc.Contracts {
+			if contract.GoodForUpload {
+				goodHosts++
+			}
+		}
+		return errors.Compose(err, fmt.Errorf("%v available hosts", goodHosts))
+	}
+	return nil
 }
 
 // WaitForDecreasingRedundancy waits until the redundancy decreases to a

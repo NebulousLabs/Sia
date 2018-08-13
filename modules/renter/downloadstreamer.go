@@ -7,6 +7,7 @@ import (
 	"math"
 	"time"
 
+	"github.com/NebulousLabs/Sia/modules/renter/siafile"
 	"github.com/NebulousLabs/errors"
 )
 
@@ -14,7 +15,7 @@ type (
 	// streamer is a io.ReadSeeker that can be used to stream downloads from
 	// the sia network.
 	streamer struct {
-		file   *file
+		file   *siafile.SiaFile
 		offset int64
 		r      *Renter
 	}
@@ -38,7 +39,7 @@ func (r *Renter) Streamer(siaPath string) (string, io.ReadSeeker, error) {
 	lockID := r.mu.RLock()
 	file, exists := r.files[siaPath]
 	r.mu.RUnlock(lockID)
-	if !exists || file.deleted {
+	if !exists || file.Deleted() {
 		return "", nil, fmt.Errorf("no file with that path: %s", siaPath)
 	}
 	// Create the streamer
@@ -46,7 +47,7 @@ func (r *Renter) Streamer(siaPath string) (string, io.ReadSeeker, error) {
 		file: file,
 		r:    r,
 	}
-	return file.name, s, nil
+	return file.SiaPath(), s, nil
 }
 
 // Read implements the standard Read interface. It will download the requested
@@ -55,9 +56,7 @@ func (r *Renter) Streamer(siaPath string) (string, io.ReadSeeker, error) {
 // only request a single chunk at once.
 func (s *streamer) Read(p []byte) (n int, err error) {
 	// Get the file's size
-	s.file.mu.RLock()
-	fileSize := int64(s.file.size)
-	s.file.mu.RUnlock()
+	fileSize := int64(s.file.Size())
 
 	// Make sure we haven't reached the EOF yet.
 	if s.offset >= fileSize {
@@ -65,10 +64,14 @@ func (s *streamer) Read(p []byte) (n int, err error) {
 	}
 
 	// Calculate how much we can download. We never download more than a single chunk.
-	chunkSize := s.file.staticChunkSize()
+	chunkIndex, chunkOffset := s.file.ChunkIndexByOffset(uint64(s.offset))
+	if chunkIndex == s.file.NumChunks() {
+		return 0, io.EOF
+	}
+	chunkSize := s.file.ChunkSize(chunkIndex)
 	remainingData := uint64(fileSize - s.offset)
 	requestedData := uint64(len(p))
-	remainingChunk := chunkSize - uint64(s.offset)%chunkSize
+	remainingChunk := chunkSize - chunkOffset
 	length := min(remainingData, requestedData, remainingChunk)
 
 	// Download data
@@ -127,9 +130,7 @@ func (s *streamer) Seek(offset int64, whence int) (int64, error) {
 	case io.SeekCurrent:
 		newOffset = s.offset
 	case io.SeekEnd:
-		s.file.mu.RLock()
-		newOffset = int64(s.file.size)
-		s.file.mu.RUnlock()
+		newOffset = int64(s.file.Size())
 	}
 	newOffset += offset
 

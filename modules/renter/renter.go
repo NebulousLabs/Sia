@@ -30,6 +30,7 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/modules/renter/contractor"
 	"github.com/NebulousLabs/Sia/modules/renter/hostdb"
+	"github.com/NebulousLabs/Sia/modules/renter/siafile"
 	"github.com/NebulousLabs/Sia/persist"
 	siasync "github.com/NebulousLabs/Sia/sync"
 	"github.com/NebulousLabs/Sia/types"
@@ -175,9 +176,7 @@ type trackedFile struct {
 type Renter struct {
 	// File management.
 	//
-	// tracking contains a list of files that the user intends to maintain. By
-	// default, files loaded through sharing are not maintained by the user.
-	files map[string]*file
+	files map[string]*siafile.SiaFile
 
 	// Download management. The heap has a separate mutex because it is always
 	// accessed in isolation.
@@ -479,7 +478,7 @@ func NewCustomRenter(g modules.Gateway, cs modules.ConsensusSet, tpool modules.T
 	}
 
 	r := &Renter{
-		files: make(map[string]*file),
+		files: make(map[string]*siafile.SiaFile),
 
 		// Making newDownloads a buffered channel means that most of the time, a
 		// new download will trigger an unnecessary extra iteration of the

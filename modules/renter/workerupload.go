@@ -118,27 +118,16 @@ func (w *worker) managedUpload(uc *unfinishedUploadChunk, pieceIndex uint64) {
 	w.uploadConsecutiveFailures = 0
 	w.mu.Unlock()
 
-	// Update the renter metadata.
-	addr := e.Address()
-	endHeight := e.EndHeight()
-	id := w.renter.mu.Lock()
-	uc.renterFile.mu.Lock()
-	contract, exists := uc.renterFile.contracts[w.contract.ID]
-	if !exists {
-		contract = fileContract{
-			ID:          w.contract.ID,
-			IP:          addr,
-			WindowStart: endHeight,
-		}
+	// Add piece to renterFile
+	err = uc.renterFile.AddPiece(w.contract.HostPublicKey, uc.index, pieceIndex, root)
+	if err != nil {
+		w.renter.log.Debugln("Worker failed to add new piece to SiaFile:", err)
+		w.managedUploadFailed(uc, pieceIndex)
+		return
 	}
-	contract.Pieces = append(contract.Pieces, pieceData{
-		Chunk:      uc.index,
-		Piece:      pieceIndex,
-		MerkleRoot: root,
-	})
-	uc.renterFile.contracts[w.contract.ID] = contract
+
+	id := w.renter.mu.Lock()
 	w.renter.saveFile(uc.renterFile)
-	uc.renterFile.mu.Unlock()
 	w.renter.mu.Unlock(id)
 
 	// Upload is complete. Update the state of the chunk and the renter's memory
