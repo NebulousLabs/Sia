@@ -34,6 +34,7 @@ Index
 | [/wallet/address](#walletaddress-get)                           | GET       |
 | [/wallet/addresses](#walletaddresses-get)                       | GET       |
 | [/wallet/backup](#walletbackup-get)                             | GET       |
+| [/wallet/changepassword](#walletchangepassword-post)            | POST      |
 | [/wallet/init](#walletinit-post)                                | POST      |
 | [/wallet/init/seed](#walletinitseed-post)                       | POST      |
 | [/wallet/lock](#walletlock-post)                                | POST      |
@@ -42,13 +43,14 @@ Index
 | [/wallet/siacoins](#walletsiacoins-post)                        | POST      |
 | [/wallet/siafunds](#walletsiafunds-post)                        | POST      |
 | [/wallet/siagkey](#walletsiagkey-post)                          | POST      |
+| [/wallet/sign](#walletsign-post)                                | POST      |
 | [/wallet/sweep/seed](#walletsweepseed-post)                     | POST      |
 | [/wallet/transaction/___:id___](#wallettransactionid-get)       | GET       |
 | [/wallet/transactions](#wallettransactions-get)                 | GET       |
 | [/wallet/transactions/___:addr___](#wallettransactionsaddr-get) | GET       |
 | [/wallet/unlock](#walletunlock-post)                            | POST      |
+| [/wallet/unspent](#walletunspent-get)                           | GET       |
 | [/wallet/verify/address/:___addr___](#walletverifyaddress-get)  | GET       |
-| [/wallet/changepassword](#walletchangepassword-post)            | POST      |
 
 #### /wallet [GET]
 
@@ -179,6 +181,22 @@ destination
 ###### Response
 standard success or error response. See
 [API.md#standard-responses](/doc/API.md#standard-responses).
+
+#### /wallet/changepassword [POST]
+
+changes the wallet's encryption password.
+
+###### Query String Parameter
+```
+// encryptionpassword is the wallet's current encryption password.
+encryptionpassword
+// newpassword is the new password for the wallet.
+newpassword
+```
+
+###### Response
+standard success or error response. See
+[#standard-responses](#standard-responses).
 
 #### /wallet/init [POST]
 
@@ -483,6 +501,33 @@ keyfiles
 standard success or error response. See
 [API.md#standard-responses](/doc/API.md#standard-responses).
 
+#### /wallet/sign [POST]
+
+Function: Sign a transaction. The wallet will attempt to sign each input
+specified.
+
+###### Request Body
+```
+{
+  // unsigned transaction
+  "transaction": { }, // types.Transaction
+
+  // inputs to sign; a mapping from OutputID to UnlockHash
+  "tosign": {
+    "1234567890abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    "abcdef0123456789abcdef0123456789abcd1234567890ef0123456789abcdef"
+  }
+}
+```
+
+###### Response
+```javascript
+{
+  // signed transaction
+  "transaction": { } // types.Transaction
+}
+```
+
 #### /wallet/sweep/seed [POST]
 
 Function: Scan the blockchain for outputs belonging to a seed and send them to
@@ -693,6 +738,49 @@ encryptionpassword string
 standard success or error response. See
 [API.md#standard-responses](/doc/API.md#standard-responses).
 
+#### /wallet/unspent [GET]
+
+returns a list of outputs that the wallet can spend.
+
+###### Response
+```javascript
+{
+  // Array of outputs that the wallet can spend.
+  "outputs": [
+    {
+      // The id of the output.
+      "id": "1234567890abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+
+      // Type of output, either 'siacoin output' or 'siafund output'.
+      "fundtype": "siacoin output",
+
+      // Height of block in which the output appeared. To calculate the
+      // number of confirmations, subtract this number from the current
+      // block height.
+      "confirmationheight": 50000,
+
+      // Unlock conditions of the output. These conditions must be met in
+      // order to spend the output.
+      "unlockconditions": {
+        "timelock": 0,
+        "publickeys": [{
+          "algorithm": "ed25519",
+          "key": "/XUGj8PxMDkqdae6Js6ubcERxfxnXN7XPjZyANBZH1I="
+        }],
+        "signaturesrequired": 1
+      },
+
+      // Hash of the unlock conditions, commonly known as the "address".
+      "unlockhash": "1234567890abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab",
+
+      // Amount of funds in the output; hastings for siacoin outputs, and
+      // siafunds for siafund outputs.
+      "value": "1234" // big int
+    }
+  ]
+}
+```
+
 #### /wallet/verify/address/:addr [GET]
 
 takes the address specified by :addr and returns a JSON response indicating if the address is valid.
@@ -704,19 +792,3 @@ takes the address specified by :addr and returns a JSON response indicating if t
 	"valid": true
 }
 ```
-
-#### /wallet/changepassword [POST]
-
-changes the wallet's encryption password.
-
-###### Query String Parameter
-```
-// encryptionpassword is the wallet's current encryption password.
-encryptionpassword
-// newpassword is the new password for the wallet.
-newpassword
-```
-
-###### Response
-standard success or error response. See
-[#standard-responses](#standard-responses).

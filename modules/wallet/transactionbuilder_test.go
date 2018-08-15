@@ -4,6 +4,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -505,6 +506,72 @@ func TestParallelBuilders(t *testing.T) {
 	expected := startingSCConfirmed.Sub(funding.Mul(types.NewCurrency64(uint64(outputsDesired))))
 	if !expected.Equals(endingSCConfirmed) {
 		t.Fatal("did not get the expected ending balance", expected, endingSCConfirmed, startingSCConfirmed)
+	}
+}
+
+// TestSignTransaction constructs a valid, signed transaction using the
+// wallet's SpendableOutputs and SignTransaction methods.
+func TestSignTransaction(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	wt, err := createWalletTester(t.Name(), modules.ProdDependencies)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer wt.closeWt()
+
+	// get an output to spend
+	outputs := wt.wallet.SpendableOutputs()
+
+	// create a transaction that sends an output to the void
+	txn := types.Transaction{
+		SiacoinInputs: []types.SiacoinInput{{
+			ParentID:         types.SiacoinOutputID(outputs[0].ID),
+			UnlockConditions: outputs[0].UnlockConditions,
+		}},
+		SiacoinOutputs: []types.SiacoinOutput{{
+			Value:      outputs[0].Value,
+			UnlockHash: types.UnlockHash{},
+		}},
+		TransactionSignatures: []types.TransactionSignature{{
+			ParentID: crypto.Hash(outputs[0].ID),
+		}},
+	}
+
+	// sign the transaction
+	err = wt.wallet.SignTransaction(&txn, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// txn should now have unlock condictions and a signature
+	if txn.SiacoinInputs[0].UnlockConditions.SignaturesRequired == 0 {
+		t.Fatal("unlock conditions are still unset")
+	}
+	if len(txn.TransactionSignatures) == 0 {
+		t.Fatal("transaction was not signed")
+	}
+
+	// the resulting transaction should be valid; submit it to the tpool and
+	// mine a block to confirm it
+	height, _ := wt.wallet.Height()
+	err = txn.StandaloneValid(height)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = wt.tpool.AcceptTransactionSet([]types.Transaction{txn})
+	if err != nil {
+		t.Fatal(err)
+	}
+	wt.addBlockNoPayout()
+
+	// the wallet should no longer list the resulting output as spendable
+	outputs = wt.wallet.SpendableOutputs()
+	if len(outputs) != 1 {
+		t.Fatal("expected one output")
+	}
+	if outputs[0].ID == types.OutputID(txn.SiacoinInputs[0].ParentID) {
+		t.Fatal("spent output still listed as spendable")
 	}
 }
 

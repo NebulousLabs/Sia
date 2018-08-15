@@ -1,6 +1,8 @@
 package main
 
 import (
+	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -12,7 +14,12 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/crypto/ssh/terminal"
 
+	"github.com/NebulousLabs/Sia/crypto"
+	"github.com/NebulousLabs/Sia/encoding"
+	"github.com/NebulousLabs/Sia/modules"
+	"github.com/NebulousLabs/Sia/modules/wallet"
 	"github.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/entropy-mnemonics"
 )
 
 var (
@@ -35,6 +42,13 @@ var (
 		Short: "View wallet balance",
 		Long:  "View wallet balance, including confirmed and unconfirmed siacoins and siafunds.",
 		Run:   wrap(walletbalancecmd),
+	}
+
+	walletBroadcastCmd = &cobra.Command{
+		Use:   "broadcast [txn]",
+		Short: "Broadcast a transaction",
+		Long:  "Broadcast a transaction to connected peers. The transaction must be valid.",
+		Run:   wrap(walletbroadcastcmd),
 	}
 
 	walletChangepasswordCmd = &cobra.Command{
@@ -146,6 +160,15 @@ A dynamic transaction fee is applied depending on the size of the transaction an
 		Long: `Send siafunds to an address, and transfer the claim siacoins to your wallet.
 Run 'wallet send --help' to see a list of available units.`,
 		Run: wrap(walletsendsiafundscmd),
+	}
+
+	walletSignCmd = &cobra.Command{
+		Use:   "sign [txn] [tosign]",
+		Short: "Sign a transaction",
+		Long: `Sign the specified inputs of a transaction. If siad is running with an
+unlocked wallet, the /wallet/sign API call will be used. Otherwise, sign will
+prompt for the wallet seed, and the signing key(s) will be regenerated.`,
+		Run: walletsigncmd,
 	}
 
 	walletSweepCmd = &cobra.Command{
@@ -450,6 +473,29 @@ Estimated Fee:       %v / KB
 		fees.Maximum.Mul64(1e3).HumanString())
 }
 
+// walletbroadcastcmd broadcasts a transaction.
+func walletbroadcastcmd(txnStr string) {
+	var txn types.Transaction
+	var err error
+	if walletRawTxn {
+		var txnBytes []byte
+		txnBytes, err = base64.StdEncoding.DecodeString(txnStr)
+		if err == nil {
+			err = encoding.Unmarshal(txnBytes, &txn)
+		}
+	} else {
+		err = json.Unmarshal([]byte(txnStr), &txn)
+	}
+	if err != nil {
+		die("Could not decode transaction:", err)
+	}
+	err = httpClient.TransactionPoolRawPost(txn, nil)
+	if err != nil {
+		die("Could not broadcast transaction:", err)
+	}
+	fmt.Println("Transaction broadcast successfully")
+}
+
 // walletsweepcmd sweeps coins and funds from a seed.
 func walletsweepcmd() {
 	seed, err := passwordPrompt("Seed: ")
@@ -462,6 +508,57 @@ func walletsweepcmd() {
 		die("Could not sweep seed:", err)
 	}
 	fmt.Printf("Swept %v and %v SF from seed.\n", currencyUnits(swept.Coins), swept.Funds)
+}
+
+// walletsigncmd signs a transaction.
+func walletsigncmd(cmd *cobra.Command, args []string) {
+	if len(args) < 1 || len(args) > 2 {
+		cmd.UsageFunc()(cmd)
+		os.Exit(exitCodeUsage)
+	}
+
+	var txn types.Transaction
+	err := json.Unmarshal([]byte(args[0]), &txn)
+	if err != nil {
+		die("Invalid transaction:", err)
+	}
+
+	var toSign []crypto.Hash
+	if len(args) == 2 {
+		err = json.Unmarshal([]byte(args[1]), &toSign)
+		if err != nil {
+			die("Invalid transaction:", err)
+		}
+	}
+
+	// try API first
+	wspr, err := httpClient.WalletSignPost(txn, toSign)
+	if err == nil {
+		txn = wspr.Transaction
+	} else {
+		// fallback to offline keygen
+		fmt.Println("Signing via API failed: either siad is not running, or your wallet is locked.")
+		fmt.Println("Enter your wallet seed to generate the signing key(s) now and sign without siad.")
+		seedString, err := passwordPrompt("Seed: ")
+		if err != nil {
+			die("Reading seed failed:", err)
+		}
+		seed, err := modules.StringToSeed(seedString, mnemonics.English)
+		if err != nil {
+			die("Invalid seed:", err)
+		}
+		err = wallet.SignTransaction(&txn, seed, toSign)
+		if err != nil {
+			die("Failed to sign transaction:", err)
+		}
+	}
+
+	if walletRawTxn {
+		base64.NewEncoder(base64.StdEncoding, os.Stdout).Write(encoding.Marshal(txn))
+	} else {
+		json.NewEncoder(os.Stdout).Encode(txn)
+	}
+	fmt.Println()
 }
 
 // wallettransactionscmd lists all of the transactions related to the wallet,

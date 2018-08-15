@@ -3,6 +3,7 @@ package wallet
 import (
 	"bytes"
 	"errors"
+	"math"
 	"sort"
 
 	"github.com/NebulousLabs/Sia/crypto"
@@ -681,4 +682,224 @@ func (w *Wallet) StartTransaction() (modules.TransactionBuilder, error) {
 	}
 	defer w.tg.Done()
 	return w.RegisterTransaction(types.Transaction{}, nil)
+}
+
+// SpendableOutputs returns the outputs spendable by the wallet.
+func (w *Wallet) SpendableOutputs() []modules.SpendableOutput {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	// ensure durability of reported outputs
+	w.syncDB()
+
+	// build initial list of confirmed outputs
+	var outputs []modules.SpendableOutput
+	dbForEachSiacoinOutput(w.dbTx, func(scoid types.SiacoinOutputID, sco types.SiacoinOutput) {
+		outputs = append(outputs, modules.SpendableOutput{
+			FundType:   types.SpecifierSiacoinOutput,
+			ID:         types.OutputID(scoid),
+			UnlockHash: sco.UnlockHash,
+			Value:      sco.Value,
+		})
+	})
+	dbForEachSiafundOutput(w.dbTx, func(sfoid types.SiafundOutputID, sfo types.SiafundOutput) {
+		outputs = append(outputs, modules.SpendableOutput{
+			FundType:   types.SpecifierSiafundOutput,
+			ID:         types.OutputID(sfoid),
+			UnlockHash: sfo.UnlockHash,
+			Value:      sfo.Value,
+		})
+	})
+
+	// don't include outputs marked as spent in pending transactions
+	pending := make(map[types.OutputID]struct{})
+	for _, pt := range w.unconfirmedProcessedTransactions {
+		for _, input := range pt.Inputs {
+			if input.WalletAddress {
+				pending[input.ParentID] = struct{}{}
+			}
+		}
+	}
+	filtered := outputs[:0]
+	for _, o := range outputs {
+		if _, ok := pending[o.ID]; !ok {
+			filtered = append(filtered, o)
+		}
+	}
+	outputs = filtered
+
+	// set the confirmation height for each output
+outer:
+	for i, o := range outputs {
+		txnIndices, _ := dbGetAddrTransactions(w.dbTx, o.UnlockHash)
+		for _, j := range txnIndices {
+			pt, err := dbGetProcessedTransaction(w.dbTx, j)
+			if err != nil {
+				continue
+			}
+			for _, sco := range pt.Outputs {
+				if sco.ID == o.ID {
+					outputs[i].ConfirmationHeight = pt.ConfirmationHeight
+					continue outer
+				}
+			}
+		}
+	}
+
+	// add unconfirmed outputs, except those that are spent in pending
+	// transactions
+	for _, pt := range w.unconfirmedProcessedTransactions {
+		for _, o := range pt.Outputs {
+			if _, ok := pending[o.ID]; !ok && o.WalletAddress {
+				outputs = append(outputs, modules.SpendableOutput{
+					FundType:           types.SpecifierSiacoinOutput,
+					ID:                 o.ID,
+					UnlockHash:         o.RelatedAddress,
+					Value:              o.Value,
+					ConfirmationHeight: types.BlockHeight(math.MaxUint64), // unconfirmed
+				})
+			}
+		}
+	}
+
+	// add UnlockConditions for each output. If we don't know the
+	// UnlockConditions, they aren't actually spendable.
+	filtered = outputs[:0]
+	for _, o := range outputs {
+		if sk, ok := w.keys[o.UnlockHash]; ok {
+			o.UnlockConditions = sk.UnlockConditions
+			filtered = append(filtered, o)
+		}
+	}
+	outputs = filtered
+
+	return outputs
+}
+
+// SignTransaction signs txn using secret keys known to the wallet. The
+// transaction should be complete with the exception of the Signature fields
+// of each TransactionSignature referenced by toSign. For convenience, if
+// toSign is empty, SignTransaction signs everything that it can.
+func (w *Wallet) SignTransaction(txn *types.Transaction, toSign []crypto.Hash) error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if !w.unlocked {
+		return modules.ErrLockedWallet
+	}
+	// if toSign is empty, sign all inputs that we have keys for
+	if len(toSign) == 0 {
+		for _, sci := range txn.SiacoinInputs {
+			if _, ok := w.keys[sci.UnlockConditions.UnlockHash()]; ok {
+				toSign = append(toSign, crypto.Hash(sci.ParentID))
+			}
+		}
+		for _, sfi := range txn.SiafundInputs {
+			if _, ok := w.keys[sfi.UnlockConditions.UnlockHash()]; ok {
+				toSign = append(toSign, crypto.Hash(sfi.ParentID))
+			}
+		}
+	}
+	return signTransaction(txn, w.keys, toSign)
+}
+
+// SignTransaction signs txn using secret keys derived from seed. The
+// transaction should be complete with the exception of the Signature fields
+// of each TransactionSignature referenced by toSign, which must not be empty.
+//
+// SignTransaction must derive all of the keys from scratch, so it is
+// appreciably slower than calling the Wallet.SignTransaction method. Only the
+// first 1 million keys are derived.
+func SignTransaction(txn *types.Transaction, seed modules.Seed, toSign []crypto.Hash) error {
+	if len(toSign) == 0 {
+		// unlike the wallet method, we can't simply "sign all inputs we have
+		// keys for," because without generating all of the keys up front, we
+		// don't know how many inputs we actually have keys for.
+		return errors.New("toSign cannot be empty")
+	}
+	// generate keys in batches up to 1e6 before giving up
+	keys := make(map[types.UnlockHash]spendableKey, 1e6)
+	var keyIndex uint64
+	const keysPerBatch = 1000
+	for len(keys) < 1e6 {
+		for _, sk := range generateKeys(seed, keyIndex, keyIndex+keysPerBatch) {
+			keys[sk.UnlockConditions.UnlockHash()] = sk
+		}
+		keyIndex += keysPerBatch
+		if err := signTransaction(txn, keys, toSign); err == nil {
+			return nil
+		}
+	}
+	return signTransaction(txn, keys, toSign)
+}
+
+// signTransaction signs the specified inputs of txn using the specified keys.
+// It returns an error if any of the specified inputs cannot be signed.
+func signTransaction(txn *types.Transaction, keys map[types.UnlockHash]spendableKey, toSign []crypto.Hash) error {
+	// helper function to lookup unlock conditions in the txn associated with
+	// a transaction signature's ParentID
+	findUnlockConditions := func(id crypto.Hash) (types.UnlockConditions, bool) {
+		for _, sci := range txn.SiacoinInputs {
+			if crypto.Hash(sci.ParentID) == id {
+				return sci.UnlockConditions, true
+			}
+		}
+		for _, sfi := range txn.SiafundInputs {
+			if crypto.Hash(sfi.ParentID) == id {
+				return sfi.UnlockConditions, true
+			}
+		}
+		return types.UnlockConditions{}, false
+	}
+	// helper function to lookup the secret key that can sign
+	findSigningKey := func(uc types.UnlockConditions, pubkeyIndex uint64) (crypto.SecretKey, bool) {
+		if pubkeyIndex >= uint64(len(uc.PublicKeys)) {
+			return crypto.SecretKey{}, false
+		}
+		pk := uc.PublicKeys[pubkeyIndex]
+		sk, ok := keys[uc.UnlockHash()]
+		if !ok {
+			return crypto.SecretKey{}, false
+		}
+		for _, key := range sk.SecretKeys {
+			pubKey := key.PublicKey()
+			if bytes.Equal(pk.Key, pubKey[:]) {
+				return key, true
+			}
+		}
+		return crypto.SecretKey{}, false
+	}
+
+	for _, id := range toSign {
+		// find associated txn signature
+		//
+		// NOTE: it's possible that the Signature field will already be filled
+		// out. Although we could save a bit of work by not signing it, in
+		// practice it's probably best to overwrite any existing signatures,
+		// since we know that ours will be valid.
+		sigIndex := -1
+		for i, sig := range txn.TransactionSignatures {
+			if sig.ParentID == id {
+				sigIndex = i
+				break
+			}
+		}
+		if sigIndex == -1 {
+			return errors.New("toSign references signatures not present in transaction")
+		}
+		// find associated input
+		uc, ok := findUnlockConditions(id)
+		if !ok {
+			return errors.New("toSign references IDs not present in transaction")
+		}
+		// lookup the signing key
+		sk, ok := findSigningKey(uc, txn.TransactionSignatures[sigIndex].PublicKeyIndex)
+		if !ok {
+			return errors.New("could not locate signing key for " + id.String())
+		}
+		// add signature
+		sigHash := txn.SigHash(sigIndex)
+		encodedSig := crypto.SignHash(sigHash, sk)
+		txn.TransactionSignatures[sigIndex].Signature = encodedSig[:]
+	}
+
+	return nil
 }

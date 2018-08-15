@@ -21,6 +21,7 @@ var (
 	renterDownloadAsync    bool   // Downloads files asynchronously
 	renterListVerbose      bool   // Show additional info about uploaded files.
 	renterShowHistory      bool   // Show download history in addition to download queue.
+	walletRawTxn           bool   // Encode/decode transactions in base64-encoded binary.
 )
 
 var (
@@ -106,14 +107,16 @@ func main() {
 
 	root.AddCommand(walletCmd)
 	walletCmd.AddCommand(walletAddressCmd, walletAddressesCmd, walletChangepasswordCmd, walletInitCmd, walletInitSeedCmd,
-		walletLoadCmd, walletLockCmd, walletSeedsCmd, walletSendCmd, walletSweepCmd,
-		walletBalanceCmd, walletTransactionsCmd, walletUnlockCmd)
+		walletLoadCmd, walletLockCmd, walletSeedsCmd, walletSendCmd, walletSweepCmd, walletSignCmd,
+		walletBalanceCmd, walletBroadcastCmd, walletTransactionsCmd, walletUnlockCmd)
 	walletInitCmd.Flags().BoolVarP(&initPassword, "password", "p", false, "Prompt for a custom password")
 	walletInitCmd.Flags().BoolVarP(&initForce, "force", "", false, "destroy the existing wallet and re-encrypt")
 	walletInitSeedCmd.Flags().BoolVarP(&initForce, "force", "", false, "destroy the existing wallet")
 	walletLoadCmd.AddCommand(walletLoad033xCmd, walletLoadSeedCmd, walletLoadSiagCmd)
 	walletSendCmd.AddCommand(walletSendSiacoinsCmd, walletSendSiafundsCmd)
 	walletUnlockCmd.Flags().BoolVarP(&initPassword, "password", "p", false, "Display interactive password prompt even if SIA_WALLET_PASSWORD is set")
+	walletBroadcastCmd.Flags().BoolVarP(&walletRawTxn, "raw", "", false, "Decode transaction as base64 instead of JSON")
+	walletSignCmd.Flags().BoolVarP(&walletRawTxn, "raw", "", false, "Encode signed transaction as base64 instead of JSON")
 
 	root.AddCommand(renterCmd)
 	renterCmd.AddCommand(renterFilesDeleteCmd, renterFilesDownloadCmd,

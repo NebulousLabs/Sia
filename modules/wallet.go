@@ -104,6 +104,17 @@ type (
 		Outputs []ProcessedOutput `json:"outputs"`
 	}
 
+	// A SpendableOutput is a SiacoinOutput or SiafundOutput that the wallet
+	// can spend.
+	SpendableOutput struct {
+		ID                 types.OutputID         `json:"id"`
+		FundType           types.Specifier        `json:"fundtype"`
+		UnlockConditions   types.UnlockConditions `json:"unlockconditions"`
+		UnlockHash         types.UnlockHash       `json:"unlockhash"`
+		Value              types.Currency         `json:"value"`
+		ConfirmationHeight types.BlockHeight      `json:"confirmationheight"`
+	}
+
 	// TransactionBuilder is used to construct custom transactions. A transaction
 	// builder is initialized via 'RegisterTransaction' and then can be modified by
 	// adding funds or other fields. The transaction is completed by calling
@@ -416,6 +427,14 @@ type (
 		// DustThreshold returns the quantity per byte below which a Currency is
 		// considered to be Dust.
 		DustThreshold() (types.Currency, error)
+
+		// SpendableOutputs returns the outputs spendable by the wallet.
+		SpendableOutputs() []SpendableOutput
+
+		// SignTransaction signs txn using secret keys known to the wallet.
+		// The transaction should be complete with the exception of the
+		// Signature fields of each TransactionSignature referenced by toSign.
+		SignTransaction(txn *types.Transaction, toSign []crypto.Hash) error
 	}
 
 	// WalletSettings control the behavior of the Wallet.

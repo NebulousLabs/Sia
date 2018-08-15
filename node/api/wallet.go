@@ -65,6 +65,18 @@ type (
 		TransactionIDs []types.TransactionID `json:"transactionids"`
 	}
 
+	// WalletSignPOSTParams contains the unsigned transaction and a set of
+	// inputs to sign.
+	WalletSignPOSTParams struct {
+		Transaction types.Transaction `json:"transaction"`
+		ToSign      []crypto.Hash     `json:"tosign"`
+	}
+
+	// WalletSignPOSTResp contains the signed transaction.
+	WalletSignPOSTResp struct {
+		Transaction types.Transaction `json:"transaction"`
+	}
+
 	// WalletSeedsGET contains the seeds used by the wallet.
 	WalletSeedsGET struct {
 		PrimarySeed        string   `json:"primaryseed"`
@@ -98,6 +110,13 @@ type (
 	WalletTransactionsGETaddr struct {
 		ConfirmedTransactions   []modules.ProcessedTransaction `json:"confirmedtransactions"`
 		UnconfirmedTransactions []modules.ProcessedTransaction `json:"unconfirmedtransactions"`
+	}
+
+	// WalletUnspentGET contains the unspent outputs of the wallet. The
+	// MaturityHeight field of each output indicates the height of the block
+	// that the output appeared in.
+	WalletUnspentGET struct {
+		Outputs []modules.SpendableOutput `json:"outputs"`
 	}
 
 	// WalletVerifyAddressGET contains a bool indicating if the address passed to
@@ -657,4 +676,29 @@ func (api *API) walletVerifyAddressHandler(w http.ResponseWriter, req *http.Requ
 
 	err := new(types.UnlockHash).LoadString(addrString)
 	WriteJSON(w, WalletVerifyAddressGET{Valid: err == nil})
+}
+
+// walletUnspentHandler handles API calls to /wallet/unspent.
+func (api *API) walletUnspentHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+	WriteJSON(w, WalletUnspentGET{
+		Outputs: api.wallet.SpendableOutputs(),
+	})
+}
+
+// walletSignHandler handles API calls to /wallet/sign.
+func (api *API) walletSignHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+	var params WalletSignPOSTParams
+	err := json.NewDecoder(req.Body).Decode(&params)
+	if err != nil {
+		WriteError(w, Error{"invalid parameters: " + err.Error()}, http.StatusBadRequest)
+		return
+	}
+	err = api.wallet.SignTransaction(&params.Transaction, params.ToSign)
+	if err != nil {
+		WriteError(w, Error{"failed to sign transaction: " + err.Error()}, http.StatusBadRequest)
+		return
+	}
+	WriteJSON(w, WalletSignPOSTResp{
+		Transaction: params.Transaction,
+	})
 }
