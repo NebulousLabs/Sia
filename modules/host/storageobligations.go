@@ -356,6 +356,17 @@ func (h *Host) managedAddStorageObligation(so storageObligation) error {
 			return errors.New("fill me in")
 		}
 
+		// If the storage obligation already has sectors, it means that the
+		// file contract is being renewed, and that the sector should be
+		// re-added with a new expiration height. If there is an error at any
+		// point, all of the sectors should be removed.
+		if len(so.SectorRoots) != 0 {
+			err := h.AddSectorBatch(so.SectorRoots)
+			if err != nil {
+				return err
+			}
+		}
+
 		// Add the storage obligation information to the database.
 		err := h.db.Update(func(tx *bolt.Tx) error {
 			// Sanity check - a storage obligation using the same file contract id
@@ -367,17 +378,6 @@ func (h *Host) managedAddStorageObligation(so storageObligation) error {
 			// during the 'addStorageObligation' phase.
 			bso := tx.Bucket(bucketStorageObligations)
 
-			// If the storage obligation already has sectors, it means that the
-			// file contract is being renewed, and that the sector should be
-			// re-added with a new expiration height. If there is an error at any
-			// point, all of the sectors should be removed.
-			if len(so.SectorRoots) != 0 {
-				err := h.AddSectorBatch(so.SectorRoots)
-				if err != nil {
-					return err
-				}
-			}
-
 			// Add the storage obligation to the database.
 			soBytes, err := json.Marshal(so)
 			if err != nil {
@@ -386,6 +386,13 @@ func (h *Host) managedAddStorageObligation(so storageObligation) error {
 			return bso.Put(soid[:], soBytes)
 		})
 		if err != nil {
+			// Database will rollback when an error is returned. Already added
+			// sectors need to be removed.
+			if len(so.SectorRoots) > 0 {
+				// Error is not checked, we want to call remove on every sector even if
+				// there are problems - disk health information will be updated.
+				_ = h.RemoveSectorBatch(so.SectorRoots)
+			}
 			return err
 		}
 
@@ -410,7 +417,9 @@ func (h *Host) managedAddStorageObligation(so storageObligation) error {
 	err = h.tpool.AcceptTransactionSet(so.OriginTransactionSet)
 	if err != nil {
 		h.log.Println("Failed to add storage obligation, transaction set was not accepted:", err)
-		return err
+		h.mu.Lock()
+		defer h.mu.Unlock()
+		return composeErrors(err, h.removeStorageObligation(so, obligationRejected))
 	}
 
 	// Queue the action items.
