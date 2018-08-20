@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
@@ -39,6 +40,24 @@ func newNamedTestingGateway(t *testing.T, suffix string) *Gateway {
 		panic(err)
 	}
 	return g
+}
+
+// NDF safe connection helpers
+func connectToNode(g1 *Gateway, g2 *Gateway, manual bool) error {
+	return build.Retry(100, 10*time.Millisecond, func() error {
+		if manual {
+			return g1.ConnectManual(g2.Address())
+		}
+		return g1.Connect(g2.Address())
+	})
+}
+func disconnectFromNode(g1 *Gateway, g2 *Gateway, manual bool) error {
+	return build.Retry(100, 10*time.Millisecond, func() error {
+		if manual {
+			return g1.DisconnectManual(g2.Address())
+		}
+		return g1.Disconnect(g2.Address())
+	})
 }
 
 // TestExportedMethodsErrAfterClose tests that exported methods like Close and
@@ -208,4 +227,109 @@ func TestParallelClose(t *testing.T) {
 		}(i)
 	}
 	wg.Wait()
+}
+
+// TestManualConnectDisconnect checks if a user initiated connect and
+// disconnect works as expected.
+func TestManualConnectDisconnect(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+	g1 := newNamedTestingGateway(t, "1")
+	defer g1.Close()
+	g2 := newNamedTestingGateway(t, "2")
+	defer g2.Close()
+
+	// g1 should be able to connect to g2
+	if err := connectToNode(g1, g2, false); err != nil {
+		t.Fatal("failed to connect:", err)
+	}
+	// g2 manually disconnects from g1 and therefore blacklists it
+	if err := disconnectFromNode(g2, g1, true); err != nil {
+		t.Fatal("failed to disconnect:", err)
+	}
+	// Neither g1 nor g2 can connect after g1 being blacklisted
+	if err := connectToNode(g1, g2, false); err == nil {
+		t.Fatal("shouldn't be able to connect")
+	}
+	if err := connectToNode(g1, g2, true); err == nil {
+		t.Fatal("shouldn't be able to connect")
+	}
+	if err := connectToNode(g2, g1, false); err == nil {
+		t.Fatal("shouldn't be able to connect")
+	}
+
+	// g2 manually connects and therefore removes g1 from the blacklist again
+	if err := connectToNode(g2, g1, true); err != nil {
+		t.Fatal("failed to connect:", err)
+	}
+
+	// g2 disconnects and lets g1 connect which should also be possible now
+	if err := disconnectFromNode(g2, g1, false); err != nil {
+		t.Fatal("failed to disconnect:", err)
+	}
+	if err := connectToNode(g1, g2, false); err != nil {
+		t.Fatal("failed to connect:", err)
+	}
+
+	// same thing again but the other way round
+	if err := disconnectFromNode(g2, g1, false); err != nil {
+		t.Fatal("failed to disconnect:", err)
+	}
+	if err := connectToNode(g2, g1, false); err != nil {
+		t.Fatal("failed to connect:", err)
+	}
+}
+
+// TestManualConnectDisconnectPersist checks if the blacklist is persistet on
+// disk
+func TestManualConnectDisconnectPersist(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+	g1 := newNamedTestingGateway(t, "1")
+	defer g1.Close()
+	g2 := newNamedTestingGateway(t, "2")
+
+	// g1 should be able to connect to g2
+	if err := connectToNode(g1, g2, false); err != nil {
+		t.Fatal("failed to connect:", err)
+	}
+
+	// g2 manually disconnects from g1 and therefore blacklists it
+	if err := disconnectFromNode(g2, g1, true); err != nil {
+		t.Fatal("failed to disconnect:", err)
+	}
+
+	// Neither g1 nor g2 can connect after g1 being blacklisted
+	if err := connectToNode(g1, g2, false); err == nil {
+		t.Fatal("shouldn't be able to connect")
+	}
+	if err := connectToNode(g1, g2, true); err == nil {
+		t.Fatal("shouldn't be able to connect")
+	}
+	if err := connectToNode(g2, g1, false); err == nil {
+		t.Fatal("shouldn't be able to connect")
+	}
+
+	// Restart g2 without deleting the tmp dir
+	g2.Close()
+	g2, err := New("localhost:0", false, g2.persistDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer g2.Close()
+
+	// Neither g1 nor g2 can connect after g1 being blacklisted
+	if err := connectToNode(g1, g2, false); err == nil {
+		t.Fatal("shouldn't be able to connect")
+	}
+	if err := connectToNode(g1, g2, true); err == nil {
+		t.Fatal("shouldn't be able to connect")
+	}
+	if err := connectToNode(g2, g1, false); err == nil {
+		t.Fatal("shouldn't be able to connect")
+	}
 }

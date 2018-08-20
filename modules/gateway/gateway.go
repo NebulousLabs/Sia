@@ -126,6 +126,8 @@ type Gateway struct {
 	handlers map[rpcID]modules.RPCFunc
 	initRPCs map[string]modules.RPCFunc
 
+	// blacklist are peers that the gateway shouldn't connect to
+	//
 	// nodes is the set of all known nodes (i.e. potential peers).
 	//
 	// peers are the nodes that the gateway is currently connected to.
@@ -141,9 +143,10 @@ type Gateway struct {
 	// and would block any threads.Flush() calls. So a second threadgroup is
 	// added which handles clean-shutdown for the peers, without blocking
 	// threads.Flush() calls.
-	nodes  map[modules.NetAddress]*node
-	peers  map[modules.NetAddress]*peer
-	peerTG siasync.ThreadGroup
+	blacklist map[string]struct{}
+	nodes     map[modules.NetAddress]*node
+	peers     map[modules.NetAddress]*peer
+	peerTG    siasync.ThreadGroup
 
 	// Utilities.
 	log        *persist.Logger
@@ -198,8 +201,9 @@ func New(addr string, bootstrap bool, persistDir string) (*Gateway, error) {
 		handlers: make(map[rpcID]modules.RPCFunc),
 		initRPCs: make(map[string]modules.RPCFunc),
 
-		nodes: make(map[modules.NetAddress]*node),
-		peers: make(map[modules.NetAddress]*peer),
+		blacklist: make(map[string]struct{}),
+		nodes:     make(map[modules.NetAddress]*node),
+		peers:     make(map[modules.NetAddress]*peer),
 
 		persistDir: persistDir,
 	}
