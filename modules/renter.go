@@ -329,6 +329,10 @@ type Renter interface {
 	// Close closes the Renter.
 	Close() error
 
+	// CancelContract cancels a specific contract of the renter.
+	CancelContract(id types.FileContractID) error
+
+	// Contracts returns the active contracts formed by the renter.
 	// Contracts returns the staticContracts of the renter's hostContractor.
 	Contracts() []RenterContract
 

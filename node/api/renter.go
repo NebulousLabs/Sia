@@ -275,6 +275,19 @@ func (api *API) renterHandlerPOST(w http.ResponseWriter, req *http.Request, _ ht
 	WriteSuccess(w)
 }
 
+// renterContractCancelHandler handles the API call to cancel a specific Renter contract.
+func (api *API) renterContractCancelHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+	var fcid types.FileContractID
+	if err := fcid.LoadString(req.FormValue("id")); err != nil {
+		return
+	}
+	err := api.renter.CancelContract(fcid)
+	if err != nil {
+		return
+	}
+	WriteSuccess(w)
+}
+
 // renterContractsHandler handles the API call to request the Renter's
 // contracts.
 //

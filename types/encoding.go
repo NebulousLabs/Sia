@@ -459,6 +459,11 @@ func (fcr *FileContractRevision) UnmarshalSia(r io.Reader) error {
 	return d.Err()
 }
 
+// LoadString loads a FileContractID from a string
+func (fcid *FileContractID) LoadString(str string) error {
+	return (*crypto.Hash)(fcid).LoadString(str)
+}
+
 // MarshalJSON marshals an id as a hex string.
 func (fcid FileContractID) MarshalJSON() ([]byte, error) {
 	return json.Marshal(fcid.String())
