@@ -115,6 +115,13 @@ type (
 	//
 	// Transaction builders are not thread safe.
 	TransactionBuilder interface {
+		// FundSiacoinForOutputs will aggregate enough inputs to cover the
+		// total value of the outputs and the miner fee if any. A refund
+		// output will be generated if necessary. All the outputs will be
+		// added to the transaction being built along with a miner fee if
+		// one is passed. The transaction will not be signed.
+		FundSiacoinsForOutputs(outputs []types.SiacoinOutput, fee types.Currency) error
+
 		// FundSiacoins will add a siacoin input of exactly 'amount' to the
 		// transaction. A parent transaction may be needed to achieve an input
 		// with the correct value. The siacoin input will not be signed until
