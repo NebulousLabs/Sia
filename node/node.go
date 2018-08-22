@@ -244,7 +244,7 @@ func New(params NodeParams) (*Node, error) {
 		if !params.CreateHost {
 			return nil, nil
 		}
-		return host.New(cs, tp, w, "localhost:0", filepath.Join(dir, modules.HostDir))
+		return host.New(cs, g, tp, w, "localhost:0", filepath.Join(dir, modules.HostDir))
 	}()
 	if err != nil {
 		return nil, errors.Extend(err, errors.New("unable to create host"))
