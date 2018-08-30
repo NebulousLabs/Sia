@@ -1,0 +1,61 @@
+syntax = "proto3";
+
+package metadata;
+
+message Record {
+
+	// MetadataCount tells the number of metadata sectors.
+	// It is put as a first message in each additional metadata sector.
+	message MetadataCount {
+		sint32 count = 1;
+	}
+
+	// NewFile creates new file.
+	// This message is copied to all the servers involved in storing
+	// the file. A file is identified by its number in other messages.
+	message NewFile {
+		sint32 file = 1; // File indices are not reused.
+		string name = 2;
+	}
+
+	// RemoveFile removes a file.
+	// This message is copied to all the servers involved in storing
+	// the file.
+	message RemoveFile {
+		sint32 file = 1;
+	}
+
+	// Write describes a write to a file.
+	message Write {
+		sint32 file = 1;
+		sint32 index_in_file = 2;
+		sint32 index_in_contract = 3; // Metadata sectors are not counted.
+		sint32 size_in_bytes = 4;
+		sint64 revision = 5; // Globally unique among Write and Discard.
+	}
+
+	// Discard describes a removal of a sector from file.
+	message Discard {
+		sint32 file = 1;
+		sint32 index_in_file = 2;
+		sint64 revision = 3; // Globally unique among Write and Discard.
+	}
+
+	// Parity describes a parity sector.
+	message Parity {
+		repeated Write datas = 1;
+		sint32 number_of_backups = 2;
+		sint32 this_backup_index = 3;
+		sint32 index_in_contract = 4; // Metadata sectors are not counted.
+	}
+
+	// The content of the change.
+	oneof content {
+		MetadataCount metadata_count = 1;
+		NewFile new_file = 2;
+		RemoveFile remove_file = 3;
+		Write write = 4;
+		Discard discard = 5;
+		Parity parity = 6;
+	}
+}
