@@ -20,6 +20,7 @@ var (
 // forks (during testing).
 func (m *Miner) blockForWork() types.Block {
 	b := m.persist.UnsolvedBlock
+	b.Transactions = m.blockTxns.transactions()
 
 	// Update the timestamp.
 	if b.Timestamp < types.CurrentTimestamp() {

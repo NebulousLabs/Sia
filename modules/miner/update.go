@@ -1,8 +1,6 @@
 package miner
 
 import (
-	"sort"
-
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -14,7 +12,7 @@ func (m *Miner) addMapElementTxns(elem *mapElement) {
 
 	// Check if heap for highest fee transactions has space.
 	if m.blockMapHeap.size+candidateSet.size < types.BlockSizeLimit-5e3 {
-		m.pushToBlock(elem)
+		m.pushToTxnList(elem)
 		return
 	}
 
@@ -31,7 +29,7 @@ func (m *Miner) addMapElementTxns(elem *mapElement) {
 		// Check if the candidateSet can fit in the block.
 		if m.blockMapHeap.size-sizeOfBottomSets+candidateSet.size < types.BlockSizeLimit-5e3 {
 			// Place candidate into block,
-			m.pushToBlock(elem)
+			m.pushToTxnList(elem)
 			// Place transactions removed from block heap into
 			// the overflow heap.
 			for _, v := range bottomSets {
@@ -49,7 +47,7 @@ func (m *Miner) addMapElementTxns(elem *mapElement) {
 			m.pushToOverflow(elem)
 			// Put back in transactions removed.
 			for _, v := range bottomSets {
-				m.pushToBlock(v)
+				m.pushToTxnList(v)
 			}
 			// Finished with this candidate set.
 			break
@@ -73,7 +71,7 @@ func (m *Miner) addMapElementTxns(elem *mapElement) {
 			m.pushToOverflow(elem)
 			// Put transaction sets from bottom back into the blockMapHeap.
 			for _, v := range bottomSets {
-				m.pushToBlock(v)
+				m.pushToTxnList(v)
 			}
 			// Finished with this candidate set.
 			break
@@ -112,12 +110,12 @@ func (m *Miner) deleteMapElementTxns(id splitSetID) {
 	} else if inBlockMapHeap {
 		// Remove from blockMapHeap.
 		m.blockMapHeap.removeSetByID(id)
-		m.removeSplitSetFromUnsolvedBlock(id)
+		m.removeSplitSetFromTxnList(id)
 
 		// Promote sets from overflow heap to block if possible.
 		for overflowElem, canPromote := m.peekAtOverflow(); canPromote && m.blockMapHeap.size+overflowElem.set.size < types.BlockSizeLimit-5e3; {
 			promotedElem := m.popFromOverflow()
-			m.pushToBlock(promotedElem)
+			m.pushToTxnList(promotedElem)
 		}
 	}
 }
@@ -137,42 +135,6 @@ func (m *Miner) deleteReverts(diff *modules.TransactionPoolDiff) {
 			delete(m.splitSets, splitSetID(ss))
 		}
 		delete(m.fullSets, id)
-	}
-}
-
-// fixSplitSetOrdering maintains the relative ordering of transactions from a
-// split set within the block.
-func (m *Miner) fixSplitSetOrdering(id splitSetID) {
-	set, _ := m.splitSets[id]
-	setTxs := set.transactions
-	var setTxIDs []types.TransactionID
-	var setTxIndices []int // These are the indices within the unsolved block.
-
-	// No swapping necessary if there are less than 2 transactions in the set.
-	if len(setTxs) < 2 {
-		return
-	}
-
-	// Iterate over all transactions in the set and store their txIDs and their
-	// indices within the unsoved block.
-	for i := 0; i < len(setTxs); i++ {
-		txID := setTxs[i].ID()
-		setTxIDs = append(setTxIDs, txID)
-		setTxIndices = append(setTxIndices, m.unsolvedBlockIndex[txID])
-	}
-
-	// Sort the indices and maintain the sets relative ordering in the block by
-	// changing their positions if necessary. The ordering within the set should
-	// be exactly the order in which the sets appear in the block.
-	sort.Ints(setTxIndices)
-	for i := 0; i < len(setTxIDs); i++ {
-		index := m.unsolvedBlockIndex[setTxIDs[i]]
-		expectedIndex := setTxIndices[i]
-		// Put the transaction in the correct position in the block.
-		if index != expectedIndex {
-			m.persist.UnsolvedBlock.Transactions[expectedIndex] = setTxs[i]
-			m.unsolvedBlockIndex[setTxIDs[i]] = expectedIndex
-		}
 	}
 }
 
@@ -230,7 +192,7 @@ func (m *Miner) peekAtOverflow() (*mapElement, bool) {
 // miner's unsolved block, and maintains proper set ordering within the block.
 func (m *Miner) popFromBlock() *mapElement {
 	elem := m.blockMapHeap.pop()
-	m.removeSplitSetFromUnsolvedBlock(elem.id)
+	m.removeSplitSetFromTxnList(elem.id)
 	return elem
 }
 
@@ -239,16 +201,16 @@ func (m *Miner) popFromOverflow() *mapElement {
 	return m.overflowMapHeap.pop()
 }
 
-// pushToBlock pushes a mapElement onto the blockMapHeap and appends it to the
-// unsolved block in the miner's global state.
-func (m *Miner) pushToBlock(elem *mapElement) {
+// pushToTxnList inserts a blockElement into the list of transactions that
+// populates the unsolved block.
+func (m *Miner) pushToTxnList(elem *mapElement) {
 	m.blockMapHeap.push(elem)
 	transactions := elem.set.transactions
 
 	// Place the transactions from this set into the block and store their indices.
 	for i := 0; i < len(transactions); i++ {
 		m.unsolvedBlockIndex[transactions[i].ID()] = len(m.persist.UnsolvedBlock.Transactions)
-		m.persist.UnsolvedBlock.Transactions = append(m.persist.UnsolvedBlock.Transactions, transactions[i])
+		m.blockTxns.appendTxn(&transactions[i])
 	}
 }
 
@@ -313,64 +275,12 @@ func (m *Miner) ReceiveUpdatedUnconfirmedTransactions(diff *modules.TransactionP
 
 // removeSplitSetFromUnsolvedBlock removes a split set from the miner's unsolved
 // block.
-func (m *Miner) removeSplitSetFromUnsolvedBlock(id splitSetID) {
+func (m *Miner) removeSplitSetFromTxnList(id splitSetID) {
 	transactions := m.splitSets[id].transactions
-	// swappedTxs stores transaction IDs for all transactions that are swapped
-	// during the process of removing this splitSet.
-	swappedTxs := make(map[types.TransactionID]struct{})
 
 	// Remove each transaction from this set from the block and track the
 	// transactions that were moved during that action.
 	for i := 0; i < len(transactions); i++ {
-		txID := m.removeTxFromUnsolvedBlock(transactions[i].ID())
-		swappedTxs[txID] = struct{}{}
+		m.blockTxns.removeTxn(transactions[i].ID())
 	}
-
-	// setsFixed keeps track of the splitSets which contain swapped transactions
-	// and have been checked for having the correct set ordering.
-	setsFixed := make(map[splitSetID]struct{})
-	// Iterate over all swapped transactions and fix the ordering of their set
-	// if necessary.
-	for txID := range swappedTxs {
-		setID, _ := m.splitSetIDFromTxID[txID]
-		_, thisSetFixed := setsFixed[setID]
-
-		// If this set was already fixed, or if the transaction is from the set
-		// being removed we can move on to the next transaction.
-		if thisSetFixed || setID == id {
-			continue
-		}
-
-		// Fix the set ordering and add the splitSet to the set of fixed sets.
-		m.fixSplitSetOrdering(setID)
-		setsFixed[setID] = struct{}{}
-	}
-}
-
-// removeTxFromUnsolvedBlock removes the given transaction by either swapping it
-// with the transaction at the end of the slice or, if the transaction to be
-// removed is the last transaction in the block, just shrinking the slice. It
-// returns the transaction ID of the last element in the block prior to the
-// swap/removal taking place.
-func (m *Miner) removeTxFromUnsolvedBlock(id types.TransactionID) types.TransactionID {
-	index, _ := m.unsolvedBlockIndex[id]
-	length := len(m.persist.UnsolvedBlock.Transactions)
-	// Remove this transactionID from the map of indices.
-	delete(m.unsolvedBlockIndex, id)
-
-	// If the transaction is already the last transaction in the block, we can
-	// remove it by just shrinking the block.
-	if index == length-1 {
-		m.persist.UnsolvedBlock.Transactions = m.persist.UnsolvedBlock.Transactions[:length-1]
-		return id
-	}
-
-	lastTx := m.persist.UnsolvedBlock.Transactions[length-1]
-	lastTxID := lastTx.ID()
-	// Swap with the last transaction in the slice, change the miner state to
-	// match the new index, and shrink the slice by 1 space.
-	m.persist.UnsolvedBlock.Transactions[index] = lastTx
-	m.unsolvedBlockIndex[lastTxID] = index
-	m.persist.UnsolvedBlock.Transactions = m.persist.UnsolvedBlock.Transactions[:length-1]
-	return lastTxID
 }

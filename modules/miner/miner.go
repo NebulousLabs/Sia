@@ -81,6 +81,7 @@ type Miner struct {
 	// header to the block manager, the rest of the block needs to be found in
 	// a lookup.
 	blockMem        map[types.BlockHeader]*types.Block             // Mappings from headers to the blocks they are derived from.
+	blockTxns       *txnList                                       // list of transactions that are supposed to be solved in the next block
 	arbDataMem      map[types.BlockHeader][crypto.EntropySize]byte // Mappings from the headers to their unique arb data.
 	headerMem       []types.BlockHeader                            // A circular list of headers that have been given out from the api recently.
 	sourceBlock     *types.Block                                   // The block from which new headers for mining are created.
@@ -168,6 +169,7 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, w modules.Walle
 		wallet: w,
 
 		blockMem:   make(map[types.BlockHeader]*types.Block),
+		blockTxns:  newTxnList(),
 		arbDataMem: make(map[types.BlockHeader][crypto.EntropySize]byte),
 		headerMem:  make([]types.BlockHeader, HeaderMemory),
 
