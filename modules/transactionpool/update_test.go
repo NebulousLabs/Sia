@@ -19,9 +19,9 @@ func TestFindSets(t *testing.T) {
 	for i := 0; i < graph1Size; i++ {
 		edges = append(edges, types.TransactionGraphEdge{
 			Dest:   i + 1,
-			Fee:    types.NewCurrency64(5),
+			Fee:    types.SiacoinPrecision.Mul64(5),
 			Source: i,
-			Value:  types.NewCurrency64(100),
+			Value:  types.SiacoinPrecision.Mul64(100),
 		})
 	}
 	graph1, err := types.TransactionGraph(types.SiacoinOutputID{}, edges)
@@ -45,9 +45,9 @@ func TestFindSets(t *testing.T) {
 	for i := 0; i < graph2Size; i++ {
 		edges = append(edges, types.TransactionGraphEdge{
 			Dest:   i + 1,
-			Fee:    types.NewCurrency64(5),
+			Fee:    types.SiacoinPrecision.Mul64(5),
 			Source: i,
-			Value:  types.NewCurrency64(100),
+			Value:  types.SiacoinPrecision.Mul64(100),
 		})
 	}
 	graph2, err := types.TransactionGraph(types.SiacoinOutputID{1}, edges)
@@ -73,9 +73,9 @@ func TestFindSets(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		edges = append(edges, types.TransactionGraphEdge{
 			Dest:   dests[i],
-			Fee:    types.NewCurrency64(5),
+			Fee:    types.SiacoinPrecision.Mul64(5),
 			Source: sources[i],
-			Value:  types.NewCurrency64(100),
+			Value:  types.SiacoinPrecision.Mul64(100),
 		})
 	}
 	graph3, err := types.TransactionGraph(types.SiacoinOutputID{2}, edges)
@@ -83,16 +83,20 @@ func TestFindSets(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	sets = findSets(append(graph1, append(graph2, graph3...)...))
-	if len(sets) != 3 {
-		t.Fatal("there should be two sets")
+	sets = findSets(append(graph3, append(graph1, graph2...)...))
+	if len(sets) != 6 {
+		t.Fatal("there should be six sets")
 	}
-	lens = []int{len(sets[0]), len(sets[1]), len(sets[2])}
+	lens = make([]int, 0, 6)
+	for _, set := range sets {
+		lens = append(lens, len(set))
+	}
 	sort.Ints(lens)
-	expected = []int{graph1Size, graph2Size, graph3Size}
-	sort.Ints(expected)
-	if lens[0] != expected[0] || lens[1] != expected[1] || lens[2] != expected[2] {
-		t.Error("Resulting sets do not have the right lengths")
+	expected = []int{1, 1, 1, 1, 5, 6}
+	for i := 0; i < len(expected); i++ {
+		if lens[i] != expected[i] {
+			t.Error("Resulting sets do not have the right lengths")
+		}
 	}
 
 	// Sporadically weave the transactions and make sure the set finder still
@@ -118,16 +122,65 @@ func TestFindSets(t *testing.T) {
 	}
 	// Result of findSets should match previous result.
 	sets = findSets(sporadic)
-	if len(sets) != 3 {
-		t.Fatal("there should be two sets")
+	if len(sets) != 6 {
+		t.Fatal("there should be six sets")
 	}
-	lens = []int{len(sets[0]), len(sets[1]), len(sets[2])}
+	lens = make([]int, 0, 6)
+	for _, set := range sets {
+		lens = append(lens, len(set))
+	}
 	sort.Ints(lens)
-	expected = []int{graph1Size, graph2Size, graph3Size}
-	sort.Ints(expected)
-	if lens[0] != expected[0] || lens[1] != expected[1] || lens[2] != expected[2] {
-		t.Error("Resulting sets do not have the right lengths")
+	expected = []int{1, 1, 1, 1, 5, 6}
+	for i := 0; i < len(expected); i++ {
+		if lens[i] != expected[i] {
+			t.Error("Resulting sets do not have the right lengths")
+		}
 	}
+}
+
+// TestFindSetsMerging checks that the merging in findSets is done properly.
+// Specifically, it checks that a child transaction is merged iff it doesn't
+// decrease the average fee of its (new) parent set
+func TestFindSetsMerging(t *testing.T) {
+	// Create a 2 level binary tree graph.
+	edges := make([]types.TransactionGraphEdge, 0, 6)
+	sources := []int{0, 0, 1, 1, 2, 2}
+	dests := []int{1, 2, 3, 4, 5, 6}
+	fees := []int{5, 5, 50, 50, 1, 3}
+
+	for i := 0; i < 6; i++ {
+		edges = append(edges, types.TransactionGraphEdge{
+			Dest:   dests[i],
+			Fee:    types.SiacoinPrecision.Mul64(uint64(fees[i])),
+			Source: sources[i],
+			Value:  types.SiacoinPrecision.Mul64(100),
+		})
+	}
+	graph, err := types.TransactionGraph(types.SiacoinOutputID{0}, edges)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sets := findSets(graph)
+	if len(sets) != 2 {
+		t.Fatal("expected 2 sets, got: ", len(sets))
+	}
+	feesReceived := make([]types.Currency, 0, 2)
+	for _, set := range sets {
+		var setFee types.Currency
+		for _, tx := range set {
+			for _, fee := range tx.MinerFees {
+				setFee = setFee.Add(fee)
+			}
+		}
+		feesReceived = append(feesReceived, setFee)
+	}
+	sort.Slice(feesReceived, func(i int, j int) bool {
+		return feesReceived[i].Cmp(feesReceived[j]) < 0
+	})
+	if feesReceived[0].Cmp(types.SiacoinPrecision.Mul64(4)) != 0 || feesReceived[1].Cmp(types.SiacoinPrecision.Mul64(110)) != 0 {
+		t.Fatal("got wrong fees from set")
+	}
+
 }
 
 // TestArbDataOnly tries submitting a transaction with only arbitrary data to

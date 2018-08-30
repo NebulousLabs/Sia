@@ -31,20 +31,10 @@ import (
 // no longer in its own set, but instead has been merged with other sets.
 //
 // Some transactions will have parents from multiple distinct sets. If a
-// transaction has parents in multiple distinct sets, those sets get merged
-// together and the transaction gets added to the result. One of the sets is
-// nominated (arbitrarily) as the official set, and the integer id of the other
-// set and the new transaction get forwarded to the official set.
-//
-// TODO: Set merging currently occurs any time that there is a child. But
-// really, it should only occur if the child increases the average fee value of
-// the set that it is merging with (which it will if and only if it has a higher
-// average fee than that set). If the child has multiple parent sets, it should
-// be compared with the parent set that has the lowest fee value. Then, after it
-// is merged with that parent, the result should be merged with the next
-// lowest-fee parent set if and only if the new set has a higher average fee
-// than the parent set. And this continues until either all of the sets have
-// been merged, or until the remaining parent sets have higher values.
+// transaction has parents in multiple distinct sets, those sets get sorted by
+// their average transaction fee. Then, in increasing order of fee, we merge
+// each parent to the transaction if and only if that merge increases the
+// average fee of the parent.
 func findSets(ts []types.Transaction) [][]types.Transaction {
 	// txMap marks what set each transaction is in. If two sets get combined,
 	// this number will not be updated. The 'forwards' map defined further on
@@ -53,6 +43,9 @@ func findSets(ts []types.Transaction) [][]types.Transaction {
 	setMap := make(map[int][]types.Transaction)
 	objMap := make(map[ObjectID]types.TransactionID)
 	forwards := make(map[int]int)
+
+	setTotalFeeMap := make(map[int]types.Currency)
+	setTotalSizeMap := make(map[int]int)
 
 	// Define a function to follow and collapse any update chain.
 	forward := func(prev int) (ret int) {
@@ -110,26 +103,109 @@ func findSets(ts []types.Transaction) [][]types.Transaction {
 			// proof outputs, siafund claim outputs; these outputs are not
 			// allowed to be spent until 50 confirmations.
 		} else {
-			// There are parent sets, pick one as the base and then merge the
-			// rest into it.
+			// Sort parent sets by average transaction fee.
 			parentsSlice := make([]int, 0, len(parentSets))
 			for j := range parentSets {
+				// Set the size and fee of this set.
+				var size int
+				var totalFee types.Currency
+				for _, tx := range setMap[j] {
+					size += tx.MarshalSiaSize()
+					for _, fee := range tx.MinerFees {
+						totalFee = totalFee.Add(fee)
+					}
+				}
+				setTotalSizeMap[j] = size
+				setTotalFeeMap[j] = totalFee
 				parentsSlice = append(parentsSlice, j)
 			}
-			base := parentsSlice[0]
-			txMap[tid] = base
-			for _, j := range parentsSlice[1:] {
-				// Forward any future transactions pointing at this set to the
-				// base set.
-				forwards[j] = base
-				// Combine the transactions in this set with the transactions in
-				// the base set.
-				setMap[base] = append(setMap[base], setMap[j]...)
-				// Delete this set map, it has been merged with the base set.
-				delete(setMap, j)
+			sort.Slice(parentsSlice, func(i, j int) bool {
+				var iAvgFee types.Currency
+				iFee := setTotalFeeMap[i]
+				iSize := setTotalSizeMap[i]
+				if iSize != 0 {
+					iAvgFee = iFee.Div64(uint64(iSize))
+				} else {
+					iAvgFee = types.ZeroCurrency
+				}
+
+				var jAvgFee types.Currency
+				jFee := setTotalFeeMap[i]
+				jSize := setTotalSizeMap[i]
+				if jSize != 0 {
+					iAvgFee = jFee.Div64(uint64(jSize))
+				} else {
+					jAvgFee = types.ZeroCurrency
+				}
+				return iAvgFee.Cmp(jAvgFee) < 0
+			})
+			tSize := t.MarshalSiaSize()
+			var tFee types.Currency
+			for _, fee := range t.MinerFees {
+				tFee = tFee.Add(fee)
 			}
-			// Add this transaction to the base set.
-			setMap[base] = append(setMap[base], t)
+
+			// The baseSet is the set to which other sets will be merged (maybe).
+			var baseSet int
+			baseSetFee := tFee
+			baseSetSize := tSize
+			var merged bool
+			for _, j := range parentsSlice {
+				parentFee := setTotalFeeMap[j]
+				parentSize := setTotalSizeMap[j]
+				parentAvgFee := parentFee.Div64(uint64(parentSize))
+
+				mergedFee := baseSetFee.Add(parentFee)
+				mergedSize := baseSetSize + parentSize
+				mergedAvgFee := mergedFee.Div64(uint64(mergedSize))
+				// Check if merging the current set to its parent set will
+				// increase the average fee.
+				if mergedAvgFee.Cmp(parentAvgFee) >= 0 {
+					// If this is the first merge, then set this parent to be
+					// the base of merges for this transaction.
+					if !merged {
+						baseSet = j
+						baseSetFee = mergedFee
+						baseSetSize = mergedSize
+						// Add this transaction to the base set, and adjust //
+						// its fee // and size.
+						txMap[tid] = baseSet
+						setMap[baseSet] = append(setMap[baseSet], []types.Transaction{t}...)
+						setTotalFeeMap[baseSet] = baseSetFee
+						setTotalSizeMap[baseSet] = baseSetSize
+						merged = true
+						continue
+					}
+					// Forward any future transactions pointing at this set to the
+					// base set.
+					forwards[j] = baseSet
+
+					// Combine the transactions in this set with the
+					// transactions in the base set.
+					setMap[baseSet] = append(setMap[baseSet], setMap[j]...)
+
+					// Increment total fee and size of baseSet.
+					setTotalFeeMap[baseSet] = setTotalFeeMap[baseSet].Add(parentFee)
+					setTotalSizeMap[baseSet] = setTotalSizeMap[baseSet] + parentSize
+
+					// Delete this set map, it has been merged with the base set.
+					delete(setMap, j)
+					delete(setTotalFeeMap, j)
+					delete(setTotalSizeMap, j)
+				} else {
+					// Since we're iterating through the parentSlice in
+					// increasing order average transaction fee if the baseSet
+					// doesn't merge with the next parent, it won't merge with
+					// the others.
+					break
+				}
+			}
+
+			if !merged {
+				// Not valuable enough to merge. Make a new set for just this transaction.
+				txMap[tid] = i
+				setMap[i] = []types.Transaction{t}
+			}
 		}
 
 		// Mark this transaction's outputs as potential inputs to future
