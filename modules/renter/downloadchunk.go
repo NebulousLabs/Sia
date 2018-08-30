@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/NebulousLabs/Sia/crypto"
@@ -229,7 +228,6 @@ func (udc *unfinishedDownloadChunk) threadedRecoverLogicalData() error {
 	udc.download.mu.Lock()
 	defer udc.download.mu.Unlock()
 	udc.download.chunksRemaining--
-	atomic.AddUint64(&udc.download.atomicDataReceived, udc.staticFetchLength)
 	if udc.download.chunksRemaining == 0 {
 		// Download is complete, send out a notification and close the
 		// destination writer.
