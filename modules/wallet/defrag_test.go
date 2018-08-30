@@ -285,3 +285,53 @@ func TestDefragInterrupted(t *testing.T) {
 	}
 
 }
+
+// TestDefragWalletSendCoins mines many blocks and checks that the wallet's outputs are
+// consolidated after spending some coins.
+func TestDefragWalletSendCoins(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+	wt, err := createWalletTester(t.Name(), &ProductionDependencies{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer wt.closeWt()
+
+	// mine defragThreshold blocks, resulting in defragThreshold outputs
+	for i := 0; i < naturalDefragThreshold; i++ {
+		_, err := wt.miner.AddBlock()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// send coins to trigger a defrag
+	uc, err := wt.wallet.NextAddress()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = wt.wallet.SendSiacoins(types.SiacoinPrecision, uc.UnlockHash())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// allow some time for the defrag transaction to occur, then mine another block
+	time.Sleep(time.Second * 5)
+
+	_, err = wt.miner.AddBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// defrag should keep the outputs below the threshold
+	wt.wallet.mu.Lock()
+	// force a sync because bucket stats may not be reliable until commit
+	wt.wallet.syncDB()
+	siacoinOutputs := wt.wallet.dbTx.Bucket(bucketSiacoinOutputs).Stats().KeyN
+	wt.wallet.mu.Unlock()
+	if siacoinOutputs > defragThreshold {
+		t.Fatalf("defrag should result in fewer than defragThreshold outputs, got %v wanted %v\n", siacoinOutputs, defragThreshold)
+	}
+}
