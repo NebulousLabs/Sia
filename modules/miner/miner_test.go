@@ -354,3 +354,75 @@ func TestMinerCloseDeadlock(t *testing.T) {
 		t.Fatal("mt.miner.Close never completed")
 	}
 }
+
+// TestMiningWhileReorg tests the behaviour of the mining during a reorg
+func TestMiningWhileReorg(t *testing.T) {
+	if testing.Short() || !build.VLONG {
+		t.SkipNow()
+	}
+	mt, err := createMinerTester(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	mt2, err := createMinerTester(t.Name() + "2")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Prepare some outputs for a big transaction
+	uc, err := mt.wallet.NextAddress()
+	if err != nil {
+		t.Fatal(err)
+	}
+	scos := make([]types.SiacoinOutput, 100)
+	for i := range scos {
+		scos[i].UnlockHash = uc.UnlockHash()
+		scos[i].Value = types.SiacoinPrecision
+	}
+
+	// Create function to send to those outputs and mine a block
+	f := func(tester *minerTester) error {
+		// Send to those outputs
+		for i := 0; i < 10; i++ {
+			if _, err := tester.wallet.SendSiacoinsMulti(scos); err != nil {
+				return build.ExtendErr("SendSiacoinsMulti failed: ", err)
+			}
+			block, err := tester.miner.FindBlock()
+			if err != nil {
+				return build.ExtendErr("FindBlock failed: ", err)
+			}
+			if err := tester.miner.managedSubmitBlock(block); err != nil {
+				return build.ExtendErr("managedSubmitBlock failed: ", err)
+			}
+		}
+		return nil
+	}
+
+	// Send an mine 10 times with tester 1 and 20 times with tester 2
+	for i := 0; i < 10; i++ {
+		if err := f(mt); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for i := 0; i < 20; i++ {
+		if err := f(mt2); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// Connect nodes
+	if err := mt.gateway.Connect(mt2.gateway.Address()); err != nil {
+		t.Fatal(err)
+	}
+	// Disconnect after a second
+	time.Sleep(time.Second)
+	if err := mt2.gateway.Disconnect(mt.gateway.Address()); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(20 * time.Second)
+	// Spend and mine 20 more blocks with tester 1 and connect again
+	for i := 0; i < 10; i++ {
+		if err := f(mt); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
