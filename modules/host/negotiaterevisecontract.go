@@ -322,11 +322,7 @@ func verifyRevision(so storageObligation, revision types.FileContractRevision, b
 	}
 
 	// The Merkle root is checked last because it is the most expensive check.
-	log2SectorSize := uint64(0)
-	for 1<<log2SectorSize < (modules.SectorSize / crypto.SegmentSize) {
-		log2SectorSize++
-	}
-	ct := crypto.NewCachedTree(log2SectorSize)
+	ct := modules.NewCachedTree()
 	for _, root := range so.SectorRoots {
 		ct.Push(root)
 	}

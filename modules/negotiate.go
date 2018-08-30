@@ -177,6 +177,15 @@ var (
 		Standard: uint64(1 << 22), // 4 MiB
 		Testing:  uint64(1 << 12), // 4 KiB
 	}).(uint64)
+
+	// log2SectorSize is the height of Merkle tree inside a cached element.
+	log2SectorSize = func() uint64 {
+		result := uint64(0)
+		for 1<<result < (SectorSize / crypto.SegmentSize) {
+			result++
+		}
+		return result
+	}()
 )
 
 type (
@@ -412,4 +421,10 @@ func VerifyFileContractRevisionTransactionSignatures(fcr types.FileContractRevis
 	// to elements that haven't been added to the transaction, verification
 	// will fail.
 	return txn.StandaloneValid(height)
+}
+
+// NewCachedTree returns a CachedMerkleTree with cached elements of SectorSize.
+// See crypto.CachedMerkleTree and merkletree.CachedTree for more details.
+func NewCachedTree() *crypto.CachedMerkleTree {
+	return crypto.NewCachedTree(log2SectorSize)
 }
