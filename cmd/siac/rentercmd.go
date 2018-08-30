@@ -637,10 +637,32 @@ func renterfilesdownloadcmd(path, destination string) {
 	fmt.Printf("\nDownloaded '%s' to %s.\n", path, abs(destination))
 }
 
+// bandwidthUnit takes bps (bits per second) as an argument and converts
+// them into a more human-readable string with a unit.
+func bandwidthUnit(bps uint64) string {
+	units := []string{"Bps", "Kbps", "Mbps", "Gbps", "Tbps", "Pbps", "Ebps", "Zbps", "Ybps"}
+	mag := uint64(1)
+	unit := ""
+	for _, unit = range units {
+		if bps < 1e3*mag {
+			break
+		} else if unit != units[len(units)-1] {
+			// don't want to perform this multiply on the last iter; that
+			// would give us 1.235 Ybps instead of 1235 Ybps
+			mag *= 1e3
+		}
+
+	}
+	return fmt.Sprintf("%.2f %s", float64(bps)/float64(mag), unit)
+}
+
 // downloadprogress will display the progress of the provided download to the
 // user, and return an error when the download is finished.
 func downloadprogress(siapath, destination string) error {
 	start := time.Now()
+
+	measurements := []uint64{0}                                  // first measurement is 0 bytes
+	numMeasurements := int(60 * time.Second / OutputRefreshRate) // 4 Ticks/second = 240 measurements / min
 	for range time.Tick(OutputRefreshRate) {
 		// Get the list of downloads.
 		queue, err := httpClient.RenterDownloadsGet()
@@ -674,16 +696,33 @@ func downloadprogress(siapath, destination string) error {
 			return nil
 		}
 
-		// Update the progress for the user.
+		// Add the current progress to the measurements.
+		measurements = append(measurements, d.Received)
+
+		// Shrink the measurements to only contain measurements from the last
+		// 60 seconds.
+		if len(measurements) > numMeasurements {
+			measurements = measurements[len(measurements)-numMeasurements:]
+		}
+
+		// Compute the progress and timespan between the first and last
+		// measurement to get the speed.
+		received := float64(measurements[len(measurements)-1] - measurements[0])
+		timespan := time.Duration(float64(time.Minute) * float64(len(measurements)) / float64(numMeasurements))
+		speed := bandwidthUnit(uint64((received * 8) / timespan.Seconds()))
+
+		// Compuate the percentage of completion and time elapsed since the
+		// start of the download.
 		pct := 100 * float64(d.Received) / float64(d.Filesize)
 		elapsed := time.Since(d.StartTime)
 		elapsed -= elapsed % time.Second // round to nearest second
-		mbps := (float64(d.Received*8) / 1e6) / time.Since(d.StartTime).Seconds()
-		fmt.Printf("\rDownloading... %5.1f%% of %v, %v elapsed, %.2f Mbps    ", pct, filesizeUnits(int64(d.Filesize)), elapsed, mbps)
+
+		// Update the progress for the user.
+		fmt.Printf("\rDownloading... %5.1f%% of %v, %v elapsed, %s    ", pct, filesizeUnits(int64(d.Filesize)), elapsed, speed)
 	}
 
 	// This code is unreachable, but the complier requires this to be here.
-	return errors.New("ERROR: download progress reached code that should not be reachable.")
+	return errors.New("ERROR: download progress reached code that should not be reachable")
 }
 
 // bySiaPath implements sort.Interface for [] modules.FileInfo based on the
