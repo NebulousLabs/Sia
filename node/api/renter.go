@@ -168,6 +168,7 @@ type (
 		StartTime            time.Time `json:"starttime"`            // The time when the download was started.
 		StartTimeUnix        int64     `json:"starttimeunix"`        // The time when the download was started in unix format.
 		TotalDataTransferred uint64    `json:"totaldatatransferred"` // The total amount of data transferred, including negotiation, overdrive etc.
+		UID                  string    `json:"uid"`                  // unique identifier that can be used to retrieve a specific download info.
 	}
 )
 
@@ -439,7 +440,36 @@ func (api *API) renterClearDownloadsHandler(w http.ResponseWriter, req *http.Req
 }
 
 // renterDownloadsHandler handles the API call to request the download queue.
-func (api *API) renterDownloadsHandler(w http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
+func (api *API) renterDownloadsHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+	// If a specific uid was specified we return a single download.
+	uid := req.FormValue("uid")
+	if uid != "" {
+		di, ok := api.renter.DownloadByUID(uid)
+		if !ok {
+			WriteError(w, Error{"Couldn't find download for specified UID"}, http.StatusBadRequest)
+			return
+		}
+		WriteJSON(w, DownloadInfo{
+			Destination:     di.Destination,
+			DestinationType: di.DestinationType,
+			Filesize:        di.Length,
+			Length:          di.Length,
+			Offset:          di.Offset,
+			SiaPath:         di.SiaPath,
+
+			Completed:            di.Completed,
+			EndTime:              di.EndTime,
+			Error:                di.Error,
+			Received:             di.Received,
+			StartTime:            di.StartTime,
+			StartTimeUnix:        di.StartTimeUnix,
+			TotalDataTransferred: di.TotalDataTransferred,
+			UID:                  di.UID,
+		})
+		return
+	}
+
+	// Otherwise we return the whole history.
 	var downloads []DownloadInfo
 	for _, di := range api.renter.DownloadHistory() {
 		downloads = append(downloads, DownloadInfo{
@@ -457,6 +487,7 @@ func (api *API) renterDownloadsHandler(w http.ResponseWriter, _ *http.Request, _
 			StartTime:            di.StartTime,
 			StartTimeUnix:        di.StartTimeUnix,
 			TotalDataTransferred: di.TotalDataTransferred,
+			UID:                  di.UID,
 		})
 	}
 	WriteJSON(w, RenterDownloadQueue{

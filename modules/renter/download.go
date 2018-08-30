@@ -124,6 +124,7 @@ package renter
 // heap.
 
 import (
+	"encoding/hex"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -134,6 +135,7 @@ import (
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/persist"
 	"github.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/fastrand"
 
 	"github.com/NebulousLabs/errors"
 )
@@ -168,6 +170,7 @@ type (
 		staticPriority      uint64        // Downloads with higher priority will complete first.
 
 		// Utilities.
+		uid           string
 		log           *persist.Logger // Same log as the renter.
 		memoryManager *memoryManager  // Same memoryManager used across the renter.
 		mu            sync.Mutex      // Unique to the download object.
@@ -374,6 +377,8 @@ func (r *Renter) managedNewDownload(params downloadParams) (*download, error) {
 
 		log:           r.log,
 		memoryManager: r.memoryManager,
+
+		uid: hex.EncodeToString(fastrand.Bytes(8)),
 	}
 
 	// Determine which chunks to download.
@@ -476,14 +481,56 @@ func (r *Renter) managedNewDownload(params downloadParams) (*download, error) {
 	return d, nil
 }
 
+// DownloadByUID retrieves the download with the specified uid. It returns a
+// DownloadInfo object and true if the object was found. Otherwise it returns
+// false.
+func (r *Renter) DownloadByUID(uid string) (modules.DownloadInfo, bool) {
+	r.downloadHistoryMu.Lock()
+	defer r.downloadHistoryMu.Unlock()
+
+	for i := range r.downloadHistory {
+		if r.downloadHistory[i].uid != uid {
+			continue
+		}
+		// Order from most recent to least recent.
+		d := r.downloadHistory[i]
+		d.mu.Lock() // Lock required for d.endTime only.
+		download := modules.DownloadInfo{
+			Destination:     d.destinationString,
+			DestinationType: d.staticDestinationType,
+			Length:          d.staticLength,
+			Offset:          d.staticOffset,
+			SiaPath:         d.staticSiaPath,
+
+			Completed:            d.staticComplete(),
+			EndTime:              d.endTime,
+			Received:             atomic.LoadUint64(&d.atomicDataReceived),
+			StartTime:            d.staticStartTime,
+			StartTimeUnix:        d.staticStartTime.UnixNano(),
+			TotalDataTransferred: atomic.LoadUint64(&d.atomicTotalDataTransferred),
+			UID:                  d.uid,
+		}
+		// Release download lock before calling d.Err(), which will acquire the
+		// lock. The error needs to be checked separately because we need to
+		// know if it's 'nil' before grabbing the error string.
+		d.mu.Unlock()
+		if d.Err() != nil {
+			download.Error = d.Err().Error()
+		} else {
+			download.Error = ""
+		}
+		return download, true
+	}
+	return modules.DownloadInfo{}, false
+}
+
 // DownloadHistory returns the list of downloads that have been performed. Will
 // include downloads that have not yet completed. Downloads will be roughly,
 // but not precisely, sorted according to start time.
 //
 // TODO: Currently the DownloadHistory only contains downloads from this
-// session, does not contain downloads that were executed for the purposes of
-// repairing, and has no way to clear the download history if it gets long or
-// unwieldy. It's not entirely certain which of the missing features are
+// session and does not contain downloads that were executed for the purposes of
+// repairing. It's not entirely certain which of the missing features are
 // actually desirable, please consult core team + app dev community before
 // deciding what to implement.
 func (r *Renter) DownloadHistory() []modules.DownloadInfo {
@@ -508,6 +555,7 @@ func (r *Renter) DownloadHistory() []modules.DownloadInfo {
 			StartTime:            d.staticStartTime,
 			StartTimeUnix:        d.staticStartTime.UnixNano(),
 			TotalDataTransferred: atomic.LoadUint64(&d.atomicTotalDataTransferred),
+			UID:                  d.uid,
 		}
 		// Release download lock before calling d.Err(), which will acquire the
 		// lock. The error needs to be checked separately because we need to
