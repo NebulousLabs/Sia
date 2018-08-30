@@ -244,6 +244,7 @@ type RenterContract struct {
 	ID            types.FileContractID
 	HostPublicKey types.SiaPublicKey
 	Transaction   types.Transaction
+	SecretKey     crypto.SecretKey
 
 	StartHeight types.BlockHeight
 	EndHeight   types.BlockHeight

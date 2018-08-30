@@ -30,6 +30,13 @@ const (
 	// the negotiation.
 	NegotiateDownloadTime = 600 * time.Second
 
+	// NegotiateMetadataTime establishes the minimum amount of time that
+	// the connection deadline is expected to be set to when a metadata
+	// is being requested from the host. The deadline is long
+	// enough that the connection should be successful even if both parties are
+	// running Tor.
+	NegotiateMetadataTime = 120 * time.Second
+
 	// NegotiateFileContractRevisionTime defines the minimum amount of time
 	// that the renter and host have to negotiate a file contract revision. The
 	// time is set high enough that a full 4MB can be piped through a
@@ -154,6 +161,9 @@ var (
 	// RPCDownload is the specifier for downloading a file from a host.
 	RPCDownload = types.Specifier{'D', 'o', 'w', 'n', 'l', 'o', 'a', 'd', 2}
 
+	// RPCMetadata is the specifier for getting the list of sector roots.
+	RPCMetadata = types.Specifier{'M', 'e', 't', 'a', 'd', 'a', 't', 'a'}
+
 	// RPCFormContract is the specifier for forming a contract with a host.
 	RPCFormContract = types.Specifier{'F', 'o', 'r', 'm', 'C', 'o', 'n', 't', 'r', 'a', 'c', 't', 2}
 
@@ -176,6 +186,14 @@ var (
 		Dev:      uint64(1 << 18), // 256 KiB
 		Standard: uint64(1 << 22), // 4 MiB
 		Testing:  uint64(1 << 12), // 4 KiB
+	}).(uint64)
+
+	// NegotiateMetadataMaxSliceSize establishes the maximum allowed length
+	// of the list of sectors returned by the Metadata RPC.
+	NegotiateMetadataMaxSliceSize = build.Select(build.Var{
+		Dev:      uint64(1 << 17),
+		Standard: uint64(1 << 17),
+		Testing:  uint64(1 << 4),
 	}).(uint64)
 )
 

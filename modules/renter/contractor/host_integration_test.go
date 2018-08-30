@@ -18,6 +18,7 @@ import (
 	"github.com/NebulousLabs/Sia/modules/host"
 	"github.com/NebulousLabs/Sia/modules/miner"
 	"github.com/NebulousLabs/Sia/modules/renter/hostdb"
+	"github.com/NebulousLabs/Sia/modules/renter/proto"
 	"github.com/NebulousLabs/Sia/modules/transactionpool"
 	modWallet "github.com/NebulousLabs/Sia/modules/wallet"
 	"github.com/NebulousLabs/Sia/types"
@@ -668,5 +669,116 @@ func TestContractPresenceLeak(t *testing.T) {
 	}
 	if errors[0].Error() != errors[1].Error() {
 		t.Fatalf("Expected to get equal errors, got %q and %q.", errors[0], errors[1])
+	}
+}
+
+// TestIntegrationMetadata tests the Metadata RPC.
+func TestIntegrationMetadata(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+	// create testing trio
+	h, c, _, err := newTestingTrio(t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer h.Close()
+	defer c.Close()
+
+	// get the host's entry from the db
+	hostEntry, ok := c.hdb.Host(h.PublicKey())
+	if !ok {
+		t.Fatal("no entry for host in db")
+	}
+
+	// form a contract with the host
+	contract, err := c.managedNewContract(hostEntry, types.SiacoinPrecision.Mul64(10), c.blockHeight+100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sc, has := c.staticContracts.Acquire(contract.ID)
+	if !has {
+		t.Fatal("c.staticContracts.Acquire returned false")
+	}
+	secketKey := sc.Metadata().SecretKey
+	windowStart := sc.Metadata().EndHeight
+	c.staticContracts.Return(sc)
+
+	// get revision and no sector ids from the host
+	lastRevision, _, err := proto.GetMetadata(hostEntry, contract.ID, secketKey, windowStart, 0, 0, nil)
+	if err != nil {
+		t.Fatalf("RPCMetadata returned error: %v", err)
+	}
+	wantSize := uint64(0)
+	if lastRevision.NewFileSize != wantSize {
+		t.Errorf("lastRevision.NewFileSize = %d, want %d", lastRevision.NewFileSize, wantSize)
+	}
+
+	n := modules.NegotiateMetadataMaxSliceSize * 2
+
+	// revise the contract
+	editor, err := c.Editor(contract.HostPublicKey, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var want []crypto.Hash
+	for i := 0; i < int(n); i++ {
+		data := fastrand.Bytes(int(modules.SectorSize))
+		root, err := editor.Upload(data)
+		if err != nil {
+			t.Fatal(err)
+		}
+		want = append(want, root)
+	}
+	err = editor.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// check correct ranges
+	correctRanges := []struct{ begin, end uint64 }{
+		{0, 0},
+		{0, 1},
+		{0, 2},
+		{0, modules.NegotiateMetadataMaxSliceSize},
+		{1, modules.NegotiateMetadataMaxSliceSize + 1},
+		{modules.NegotiateMetadataMaxSliceSize, 2 * modules.NegotiateMetadataMaxSliceSize},
+		{uint64(n - 1), uint64(n)},
+		{uint64(n - 1), uint64(n - 1)},
+		{uint64(n), uint64(n)},
+	}
+	for _, r := range correctRanges {
+		// get revision and sector IDs from the host
+		lastRevision, got, err := proto.GetMetadata(hostEntry, contract.ID, secketKey, windowStart, r.begin, r.end, nil)
+		size := r.end - r.begin
+		if err != nil {
+			t.Fatalf("RPCMetadata returned error for case %v: %v", r, err)
+		}
+		wantSize = n * modules.SectorSize
+		if lastRevision.NewFileSize != wantSize {
+			t.Errorf("case %v, lastRevision.NewFileSize = %d, want %d", r, lastRevision.NewFileSize, wantSize)
+		}
+		if uint64(len(got)) != size {
+			t.Fatalf("case %v, list length: want %d, got %d", r, size, len(got))
+		}
+		for i := r.begin; i < r.end; i++ {
+			if got[i-r.begin] != want[i] {
+				t.Errorf("RPCMetadata returned wrong sector id for case %v for sector %d", r, i)
+			}
+		}
+	}
+
+	// check incorrect ranges
+	incorrectRanges := []struct{ begin, end uint64 }{
+		{5, 4},
+		{0, modules.NegotiateMetadataMaxSliceSize + 1},
+		{uint64(n - 1), uint64(n + 1)},
+	}
+	for _, r := range incorrectRanges {
+		_, _, err := proto.GetMetadata(hostEntry, contract.ID, secketKey, windowStart, r.begin, r.end, nil)
+		if err == nil {
+			t.Fatalf("RPCMetadata succeeded for case %v, want error", r)
+		}
 	}
 }

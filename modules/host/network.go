@@ -281,6 +281,9 @@ func (h *Host) threadedHandleConn(conn net.Conn) {
 	case modules.RPCDownload:
 		atomic.AddUint64(&h.atomicDownloadCalls, 1)
 		err = extendErr("incoming RPCDownload failed: ", h.managedRPCDownload(conn))
+	case modules.RPCMetadata:
+		atomic.AddUint64(&h.atomicMetadataCalls, 1)
+		err = extendErr("incoming RPCMetadata failed: ", h.managedRPCMetadata(conn))
 	case modules.RPCRenewContract:
 		atomic.AddUint64(&h.atomicRenewCalls, 1)
 		err = extendErr("incoming RPCRenewContract failed: ", h.managedRPCRenewContract(conn))
