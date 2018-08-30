@@ -423,3 +423,245 @@ func (tp *TransactionPool) PurgeTransactionPool() {
 	tp.purge()
 	tp.mu.Unlock()
 }
+
+// objectLocations are used to pinpoint the exact locations of an object in a
+// transaction set so as to avoid recomputing ObjectIDs when searching for
+// objects.
+type objectLocation struct {
+	setID   TransactionSetID
+	txIndex int
+}
+
+// findObjectLocations finds the locations that reference the given object as an
+// input.
+func (tp *TransactionPool) findObjectLocations(oid ObjectID) ([]*objectLocation, bool) {
+	/*
+		This method should rely on new state that should be added to the transaction
+		pool. The following transaction fields all reference output ids:
+			SiacoinInput, SiafundInput, FileContractRevisions, StorageProofs
+
+		This method should return the locations of the given oid as an input in the
+		outputs listed above.
+
+		Alternatively, when child sets are only merged with parents when they do not
+		decrease their parents fee and cP4P is implemented a new transaction set
+		type can be created.
+
+		Currently this implementation relies on the fact that an output will be
+		spent in an input in the same transaction set.
+	*/
+	var locations []*objectLocation
+
+	setID := tp.knownObjects[oid]
+	set := tp.transactionSets[setID]
+	for i := 0; i < len(set); i++ {
+		var found bool
+		var location objectLocation
+		location.setID = setID
+		for _, sci := range set[i].SiacoinInputs {
+			if oid == ObjectID(sci.ParentID) {
+				found = true
+				location.txIndex = i
+			}
+		}
+		for _, sfi := range set[i].SiafundInputs {
+			if oid == ObjectID(sfi.ParentID) {
+				found = true
+				location.txIndex = i
+			}
+		}
+		for _, fcr := range set[i].FileContractRevisions {
+			if oid == ObjectID(fcr.ParentID) {
+				found = true
+				location.txIndex = i
+			}
+		}
+		for _, sp := range set[i].StorageProofs {
+			if oid == ObjectID(sp.ParentID) {
+				found = true
+				location.txIndex = i
+			}
+		}
+		if found {
+			locations = append(locations, &location)
+		}
+	}
+
+	if len(locations) == 0 {
+		return nil, false
+	}
+	return locations, true
+}
+
+// removeTransaction removes a transaction and any transactions that spend its
+// outputs from the tpool.
+func (tp *TransactionPool) removeTransaction(txn types.Transaction, cc *modules.ConsensusChange) {
+	// removedTxnIndices is used to keep track of which need to be removed from
+	// which sets. Sets are changed (and a diff is created) once all changes
+	// have been finalized. objectLocations are used to pinpoint txn indices
+	// quickly. removedTxnIndices are kept in sorted order.
+	removedTxnIndices := make(map[TransactionSetID][]int)
+	objectLocations := make(map[ObjectID][]*objectLocation)
+
+	// removedObjects stores all object IDs of objects in transactions removed,
+	// or put in the stack to be removed.
+	removedObjects := make(map[ObjectID]struct{})
+	// removalStack is a stack of objects from removed transactions that
+	// need to be removed from other transactions.
+	var removalStack []ObjectID
+
+	// addTxnToRemovalStack adds all outputs of a transaction into the removal
+	// stack, and marks all fields (including outputs) for removal. This is to
+	// ensure that references to those objects don't remain in the
+	// transactionpool state and incur a memory-leak.
+	addTxnToRemovalStack := func(txn types.Transaction) {
+		// Add all output fields to the set of objects to remove and add
+		// them to the removal stack.
+		for i := range txn.SiacoinOutputs {
+			id := ObjectID(txn.SiacoinOutputID(uint64(i)))
+			if _, alreadyQueuedForRemoval := removedObjects[id]; !alreadyQueuedForRemoval {
+				removedObjects[id] = struct{}{}
+				removalStack = append(removalStack, id)
+			}
+		}
+		for i := range txn.SiafundOutputs {
+			id := ObjectID(txn.SiafundOutputID(uint64(i)))
+			if _, alreadyQueuedForRemoval := removedObjects[id]; !alreadyQueuedForRemoval {
+				removedObjects[id] = struct{}{}
+				removalStack = append(removalStack, id)
+			}
+		}
+
+		// TODO: Make sure all outputs are accounted for properly in file
+		// contract related fields. Do `NewValidProofOutputs` and
+		// `NewMissedProofOutputs` fields of a FileContractRevision need to be
+		// added to the removal stack as well?
+		for i := range txn.FileContracts {
+			id := ObjectID(txn.FileContractID(uint64(i)))
+			if _, alreadyQueuedForRemoval := removedObjects[id]; !alreadyQueuedForRemoval {
+				removedObjects[id] = struct{}{}
+				removalStack = append(removalStack, id)
+			}
+		}
+		for _, fcr := range txn.FileContractRevisions {
+			id := ObjectID(crypto.HashObject(fcr))
+			if _, alreadyQueuedForRemoval := removedObjects[id]; !alreadyQueuedForRemoval {
+				removedObjects[id] = struct{}{}
+				removalStack = append(removalStack, id)
+			}
+		}
+		for _, sp := range txn.StorageProofs {
+			id := ObjectID(crypto.HashObject(sp))
+			if _, alreadyQueuedForRemoval := removedObjects[id]; !alreadyQueuedForRemoval {
+				removedObjects[id] = struct{}{}
+				removalStack = append(removalStack, id)
+			}
+		}
+	}
+
+	// Add the given transaction's objects to the stack, and then handle all
+	// objects in the stack.
+	addTxnToRemovalStack(txn)
+	for n := len(removalStack); n != 0; {
+		// Pop off next object ID from the stack.
+		nextObjectID := removalStack[n-1]
+		removalStack = removalStack[:n-1]
+
+		// Get the location of the object just popped from the stack.
+		// TODO: this needs to be a func that gets locations from inputs that refer to
+		// outputs in the stack
+		nextObjectLocations, ok := objectLocations[nextObjectID]
+		if !ok {
+			nextObjectLocations, ok = tp.findObjectLocations(nextObjectID)
+			if !ok {
+				//TODO: Decide: Is this correct behavior? should this ever happen?
+				continue
+			}
+		}
+
+		for _, loc := range nextObjectLocations {
+			set := tp.transactionSets[loc.setID]
+			removedIndices := removedTxnIndices[loc.setID]
+
+			i := sort.SearchInts(removedIndices, loc.txIndex)
+			if i < len(removedIndices) && removedIndices[i] == loc.txIndex {
+				// The tx index is present at removedIndices[i], therefore this
+				// transaction has already been marked for removal, along with
+				// any of its output objects.
+				continue
+			}
+			// The tx index is not present in data, but i is the index where it
+			// would be inserted to maintain the sorted order. Insert the index
+			// into the slice marking removed transactions.
+			removedIndices = removedIndices[0 : len(removedIndices)+1]
+			copy(removedIndices[i+1:], removedIndices[i:])
+			removedIndices[i] = loc.txIndex
+
+			// Add all output objects to the removal stack.
+			addTxnToRemovalStack(set[loc.txIndex])
+		}
+	}
+
+	// At this point all transaction sets which have had transactions removed,
+	// will be marked in removedTxnIndices. Now we clean up each set
+	// individually, creating new transaction sets and a diff along the way.
+	diff := new(modules.TransactionPoolDiff)
+
+	for setID, txnIndices := range removedTxnIndices {
+		// Prepare changes to diff.
+		var unconfirmedSet modules.UnconfirmedTransactionSet
+		unconfirmedSet.Change = cc
+
+		numIndices := len(removedTxnIndices)
+		indexPointer := 0
+		nextIndex := txnIndices[indexPointer]
+
+		set := tp.transactionSets[setID]
+		for i := 0; i < len(set); i++ {
+			// Increment the pointer to the slice of removed transaction indices.
+			for indexPointer < numIndices-1 && nextIndex < i {
+				indexPointer++
+				if indexPointer > numIndices-1 {
+					break
+				}
+				nextIndex = txnIndices[indexPointer]
+			}
+
+			// If this transaction has been marked for removal, it can't need to
+			// be added to the new set replacing this set.
+			if i != txnIndices[indexPointer] {
+				// Remove this transaction's ID from the tpool's state.
+				delete(tp.transactionHeights, set[i].ID())
+				continue
+			}
+			// This transaction has been untouched by the removal process, so it
+			// goes back into a transaction set.
+			unconfirmedSet.IDs = append(unconfirmedSet.IDs, set[i].ID())
+			unconfirmedSet.Sizes = append(unconfirmedSet.Sizes, uint64(set[i].MarshalSiaSize()))
+			unconfirmedSet.Transactions = append(unconfirmedSet.Transactions, set[i])
+		}
+		if len(unconfirmedSet.Transactions) == 0 {
+			continue
+		}
+		// Add the changes made to this set to the diff.
+		unconfirmedSet.ID = modules.TransactionSetID(crypto.HashObject(unconfirmedSet.Transactions))
+		diff.AppliedTransactions = append(diff.AppliedTransactions, &unconfirmedSet)
+		diff.RevertedTransactions = append(diff.RevertedTransactions, modules.TransactionSetID(setID))
+
+		// Make the necessary changes to the tpool's state.
+		delete(tp.subscriberSets, setID)
+		tp.subscriberSets[TransactionSetID(unconfirmedSet.ID)] = &unconfirmedSet
+		delete(tp.transactionSetDiffs, setID)
+		tp.transactionSetDiffs[TransactionSetID(unconfirmedSet.ID)] = cc
+	}
+
+	// Delete all removed objects from tpool state.
+	for object, _ := range removedObjects {
+		delete(tp.knownObjects, object)
+	}
+
+	// Update subscribers on changes that have been made.
+	for _, subscriber := range tp.subscribers {
+		subscriber.ReceiveUpdatedUnconfirmedTransactions(diff)
+	}
+}
